@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UNet Experiments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>UNet Architecture Experiments</h1>
+    </header>
+    
+    <nav class="top-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+    
+    <main>
+        <section class="hyperparameters">
+            <h2>Configuration</h2>
+            <div class="config-grid">
+                <div class="config-card">
+                    <h3>Model Configuration</h3>
+                    <table>
+                        <tr>
+                            <td>Architecture</td>
+                            <td>{{ common_config.model.architecture }}</td>
+                        </tr>
+                        <tr>
+                            <td>Input Channels</td>
+                            <td>{{ common_config.model.in_channels }}</td>
+                        </tr>
+                        <tr>
+                            <td>Classes</td>
+                            <td>{{ common_config.model.num_classes }}</td>
+                        </tr>
+                        <tr>
+                            <td>Class Labels</td>
+                            <td>{{ common_config.model.class_labels|join(', ') }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="config-card">
+                    <h3>Training Configuration</h3>
+                    <table>
+                        <tr>
+                            <td>Loss Function</td>
+                            <td>{{ common_config.training.loss_function }}</td>
+                        </tr>
+                        <tr>
+                            <td>Optimizer</td>
+                            <td>{{ common_config.training.optimizer }}</td>
+                        </tr>
+                        <tr>
+                            <td>Learning Rate</td>
+                            <td>{{ common_config.training.learning_rate }}</td>
+                        </tr>
+                        <tr>
+                            <td>Batch Size</td>
+                            <td>{{ common_config.training.batch_size }}</td>
+                        </tr>
+                        <tr>
+                            <td>Epochs</td>
+                            <td>{{ common_config.training.epochs }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="experiments">
+            {% for exp_id, experiment in experiments.items() %}
+            <div class="experiment-card">
+                <div class="experiment-header">
+                    <h3>{{ experiment.name }}</h3>
+                    <div class="model-params">
+                        <div class="param-item">
+                            <span class="param-label">Total Params:</span>
+                            <span class="param-value">{{ "{:,}".format(experiment.model_parameters.total) }}</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Trainable:</span>
+                            <span class="param-value">{{ "{:,}".format(experiment.model_parameters.trainable) }}</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Encoder:</span>
+                            <span class="param-value">{{ "{:,}".format(experiment.model_parameters.encoder) }}</span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Decoder:</span>
+                            <span class="param-value">{{ "{:,}".format(experiment.model_parameters.decoder) }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <section class="training-metrics">
+                    <div class="section-header">
+                        <h3>Training Progress</h3>
+                        <button class="update-btn" onclick="updateTrainingMetrics('{{ exp_id }}')">Update Training Metrics</button>
+                    </div>
+                    
+                    <div class="training-summary">
+                        <div class="summary-card">
+                            <h4>Training Summary</h4>
+                            <table class="summary-table">
+                                <tr>
+                                    <td>Best Train Loss:</td>
+                                    <td id="best-train-loss-{{ exp_id }}">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Best Val Loss:</td>
+                                    <td id="best-val-loss-{{ exp_id }}">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Avg Epoch:</td>
+                                    <td id="avg-epoch-time-{{ exp_id }}">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Total Time:</td>
+                                    <td id="total-train-time-{{ exp_id }}">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Epochs:</td>
+                                    <td id="total-epochs-{{ exp_id }}">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+                        <div id="trainingChart-{{ exp_id }}"></div>
+                        <div id="validationChart-{{ exp_id }}"></div>
+                    </div>
+                </section>
+
+                <section class="test-metrics">
+                    <div class="section-header">
+                        <h3>Test Metrics</h3>
+                        <button class="update-btn" onclick="updateTestMetrics('{{ exp_id }}')">Update Test Metrics</button>
+                    </div>
+                    
+                    <table class="metrics-table">
+                        <tr>
+                            <th>Metric</th>
+                            <th>All Classes</th>
+                            <th>Building</th>
+                            <th>Boundary</th>
+                            <th>Contact Point</th>
+                        </tr>
+                        <tr>
+                            <td>IoU</td>
+                            <td id="iou-all-{{ exp_id }}">-</td>
+                            <td id="iou-building-{{ exp_id }}">-</td>
+                            <td id="iou-boundary-{{ exp_id }}">-</td>
+                            <td id="iou-contact-{{ exp_id }}">-</td>
+                        </tr>
+                        <tr>
+                            <td>F1 Score</td>
+                            <td id="f1-score-all-{{ exp_id }}">-</td>
+                            <td id="f1-score-building-{{ exp_id }}">-</td>
+                            <td id="f1-score-boundary-{{ exp_id }}">-</td>
+                            <td id="f1-score-contact-{{ exp_id }}">-</td>
+                        </tr>
+                        <tr>
+                            <td>Accuracy</td>
+                            <td id="accuracy-all-{{ exp_id }}">-</td>
+                            <td id="accuracy-building-{{ exp_id }}">-</td>
+                            <td id="accuracy-boundary-{{ exp_id }}">-</td>
+                            <td id="accuracy-contact-{{ exp_id }}">-</td>
+                        </tr>
+                        <tr>
+                            <td>Precision</td>
+                            <td id="precision-all-{{ exp_id }}">-</td>
+                            <td id="precision-building-{{ exp_id }}">-</td>
+                            <td id="precision-boundary-{{ exp_id }}">-</td>
+                            <td id="precision-contact-{{ exp_id }}">-</td>
+                        </tr>
+                        <tr>
+                            <td>Recall</td>
+                            <td id="recall-all-{{ exp_id }}">-</td>
+                            <td id="recall-building-{{ exp_id }}">-</td>
+                            <td id="recall-boundary-{{ exp_id }}">-</td>
+                            <td id="recall-contact-{{ exp_id }}">-</td>
+                        </tr>
+                    </table>
+                </section>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section class="model-comparison">
+            <h2>Model Comparison Analysis</h2>
+            
+            <!-- Performance Metrics Comparison -->
+            <div class="comparison-card">
+                <h3>Building Segmentation Performance</h3>
+                <div id="buildingMetricsChart"></div>
+            </div>
+
+            <!-- Convergence Analysis -->
+            <div class="comparison-card">
+                <h3>Model Convergence</h3>
+                <div id="convergenceChart"></div>
+            </div>
+
+            <!-- Conclusion Card -->
+            <div class="comparison-card conclusion">
+                <h3>Comparative Analysis Conclusion</h3>
+                <div id="modelConclusion"></div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/comparison.js') }}"></script>
+</body>
+</html> 

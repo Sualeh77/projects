@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Building Footprint Segmentation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Building Footprint Segmentation</h1>
+    </header>
+    
+    <nav>
+        <p>Explore our comprehensive training experiments comparing different segmentation models for building footprint extraction from satellite imagery:</p>
+        <div class="nav-buttons">
+            <a href="{{ url_for('unet_experiments') }}" class="fancy-button">UNet Experiments</a>
+            <a href="{{ url_for('hyperparameter_tuning') }}" class="fancy-button">Hyperparameter Tuning</a>
+            <a href="{{ url_for('model_comparison') }}" class="fancy-button">Model Comparison</a>
+            <!-- Add more experiment sections here -->
+        </div>
+    </nav>
+    
+    <main>
+    </main>
+</body>
+</html> 

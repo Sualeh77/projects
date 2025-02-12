@@ -1,0 +1,9 @@
+# The .gitignore file should be at the root of your git repository
+# If this file is inside bfp-segmentation folder, use:
+logs/
+checkpoints/
+.DS_Store
+
+# If this file is at the same level as bfp-segmentation folder, use:
+bfp-segmentation/logs/
+bfp-segmentation/checkpoints/

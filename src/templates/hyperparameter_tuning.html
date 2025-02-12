@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hyperparameter Tuning Experiments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        window.baseModelMetrics = {{ base_metrics_json|safe }};
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Hyperparameter Tuning Experiments</h1>
+    </header>
+    
+    <nav class="top-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+
+    <main>
+        <!-- Base Model Information -->
+        <section class="base-model-info comparison-card">
+            <h2>Base Model Configuration</h2>
+            <div class="model-info-grid">
+                <div class="info-card">
+                    <h3>Architecture Details</h3>
+                    <ul>
+                        <li><strong>Model:</strong> {{ base_model.name }}</li>
+                        <li><strong>Encoder:</strong> {{ base_model.encoder }}</li>
+                        <li><strong>Parameters:</strong> {{ base_model.parameters.total | format_number }}</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3>Current Hyperparameters</h3>
+                    <ul>
+                        <li><strong>Learning Rate:</strong> {{ base_model.hyperparameters.learning_rate | format_lr }}</li>
+                        <li><strong>Optimizer:</strong> {{ base_model.hyperparameters.optimizer }}</li>
+                        <li><strong>Scheduler:</strong> {{ base_model.hyperparameters.scheduler }}</li>
+                        <li><strong>Batch Size:</strong> {{ base_model.hyperparameters.batch_size }}</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3>Base Performance</h3>
+                    <ul>
+                        <li><strong>Building IoU:</strong> {{ "%.4f"|format(base_model.metrics.iou_building) }}</li>
+                        <li><strong>F1 Score:</strong> {{ "%.4f"|format(base_model.metrics.f1_building) }}</li>
+                        <li><strong>Training Time:</strong> {{ base_model.metrics.training_time }} minutes</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Hyperparameter Experiments -->
+        <section class="hyperparameter-experiments">
+            <h2>Tuning Experiments</h2>
+            
+            <!-- Learning Rate Experiments -->
+            <div class="comparison-card">
+                <div class="section-header">
+                    <h3>Learning Rate Study</h3>
+                    <button class="fancy-button update-btn" id="updateLRCharts">Update Charts</button>
+                </div>
+                <div class="chart-container">
+                    <div id="lrTrainingChart" class="chart"></div>
+                    <div id="lrValidationChart" class="chart"></div>
+                </div>
+                <div class="metrics-table-container">
+                    <h4>Building Segmentation Metrics</h4>
+                    <table id="lrMetricsTable" class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <!-- Headers will be added dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>IoU</td></tr>
+                            <tr><td>F1-Score</td></tr>
+                            <tr><td>Accuracy</td></tr>
+                            <tr><td>Precision</td></tr>
+                            <tr><td>Recall</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Optimizer Comparison -->
+            <div class="comparison-card">
+                <div class="section-header">
+                    <h3>Optimizer Comparison</h3>
+                    <button class="fancy-button update-btn" id="updateOptimizerCharts">Update Charts</button>
+                </div>
+                <div class="chart-container">
+                    <div id="optimizerTrainingChart" class="chart"></div>
+                    <div id="optimizerValidationChart" class="chart"></div>
+                </div>
+                <div class="metrics-table-container">
+                    <h4>Building Segmentation Metrics</h4>
+                    <table id="optimizerMetricsTable" class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>IoU</td></tr>
+                            <tr><td>F1-Score</td></tr>
+                            <tr><td>Accuracy</td></tr>
+                            <tr><td>Precision</td></tr>
+                            <tr><td>Recall</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Scheduler Analysis -->
+            <div class="comparison-card">
+                <div class="section-header">
+                    <h3>Learning Rate Scheduler Analysis</h3>
+                    <button class="fancy-button update-btn" id="updateSchedulerCharts">Update Charts</button>
+                </div>
+                <div class="chart-container">
+                    <div id="schedulerTrainingChart" class="chart"></div>
+                    <div id="schedulerValidationChart" class="chart"></div>
+                </div>
+                <div class="metrics-table-container">
+                    <h4>Building Segmentation Metrics</h4>
+                    <table id="schedulerMetricsTable" class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>IoU</td></tr>
+                            <tr><td>F1-Score</td></tr>
+                            <tr><td>Accuracy</td></tr>
+                            <tr><td>Precision</td></tr>
+                            <tr><td>Recall</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Augmentation Analysis -->
+            <div class="comparison-card">
+                <div class="section-header">
+                    <h3>Data Augmentation Analysis</h3>
+                    <button class="fancy-button update-btn" id="updateAugmentationCharts">Update Charts</button>
+                </div>
+                <div class="chart-container">
+                    <div id="augmentationTrainingChart" class="chart"></div>
+                    <div id="augmentationValidationChart" class="chart"></div>
+                </div>
+                <div class="metrics-table-container">
+                    <h4>Building Segmentation Metrics</h4>
+                    <table id="augmentationMetricsTable" class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <!-- Headers will be added dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>IoU</td></tr>
+                            <tr><td>F1-Score</td></tr>
+                            <tr><td>Accuracy</td></tr>
+                            <tr><td>Precision</td></tr>
+                            <tr><td>Recall</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        
+    </main>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+
+    <script src="{{ url_for('static', filename='js/hyperparameter_charts.js') }}"></script>
+</body>
+</html> 

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Model Architecture Benchmark</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        window.baseModelMetrics = {{ base_metrics_json|safe }};
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Model Architecture Benchmark</h1>
+    </header>
+    
+    <nav class="top-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+
+    <main>
+        <!-- Base Configuration Information -->
+        <section class="base-model-info comparison-card">
+            <h2>Benchmark Configuration</h2>
+            <div class="model-info-grid">
+                <div class="info-card">
+                    <h3>Training Configuration</h3>
+                    <ul>
+                        <li><strong>Learning Rate:</strong> {{ base_model.hyperparameters.learning_rate | format_lr }}</li>
+                        <li><strong>Optimizer:</strong> {{ base_model.hyperparameters.optimizer }}</li>
+                        <li><strong>Scheduler:</strong> {{ base_model.hyperparameters.scheduler }}</li>
+                        <li><strong>Batch Size:</strong> {{ base_model.hyperparameters.batch_size }}</li>
+                        <li><strong>Epochs:</strong> {{ base_model.hyperparameters.epochs }}</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3>Augmentation Strategy</h3>
+                    <ul>
+                        {% for aug_name, aug_value in base_model.augmentations.items() %}
+                        <li><strong>{{ aug_name }}:</strong> {{ aug_value }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h3>Base Model Performance</h3>
+                    <ul>
+                        <li><strong>Building IoU:</strong> {{ "%.4f"|format(base_model.metrics.iou_building) }}</li>
+                        <li><strong>F1 Score:</strong> {{ "%.4f"|format(base_model.metrics.f1_building) }}</li>
+                        <li><strong>Training Time:</strong> {{ base_model.metrics.training_time }} minutes</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Model Comparison Section -->
+        <section class="model-comparison">
+            <h2>Architecture Performance Comparison</h2>
+            
+            <!-- Training and Validation Charts -->
+            <div class="comparison-card">
+                <div class="section-header">
+                    <h3>Training Progress Comparison</h3>
+                    <button class="fancy-button update-btn" id="updateModelCharts">Update Charts</button>
+                </div>
+                <div class="chart-container">
+                    <div id="modelTrainingChart" class="chart"></div>
+                    <div id="modelValidationChart" class="chart"></div>
+                </div>
+                <div class="metrics-table-container">
+                    <h4>Building Segmentation Metrics</h4>
+                    <table id="modelMetricsTable" class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <!-- Headers will be added dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>IoU</td></tr>
+                            <tr><td>F1-Score</td></tr>
+                            <tr><td>Accuracy</td></tr>
+                            <tr><td>Precision</td></tr>
+                            <tr><td>Recall</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="fancy-button">Back to Home</a>
+    </nav>
+
+    <script src="{{ url_for('static', filename='js/model_comparison_charts.js') }}"></script>
+</body>
+</html> 

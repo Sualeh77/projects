@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "bfp-segmentation"
+version = "0.1.0"
+description = ""
+authors = ["Sualeh Qureshi <sualeh.qureshi@tomtom.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "2.2.2"
+torchaudio = "2.2.2"
+torchmetrics = "1.6.0"
+torchvision = "0.17.2"
+torchgeo = "0.6.2"
+bitsandbytes = "0.42.0"
+numpy = "1.26.4"
+scikit-learn = "^1.6.0"
+geopandas = "^1.0.1"
+gdal = "^3.10"
+opencv-python = "^4.10.0.84"
+georaster = "^1.25"
+scikit-image = "^0.25.0"
+albumentations = "^2.0.3"
+segmentation-models-pytorch = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.packages]]
+include = "src"
