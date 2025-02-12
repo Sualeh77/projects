@@ -7,3 +7,7 @@ checkpoints/
 # If this file is at the same level as bfp-segmentation folder, use:
 bfp-segmentation/logs/
 bfp-segmentation/checkpoints/
+
+# Python cache files
+**/__pycache__/
+**/*.pyc

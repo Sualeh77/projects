@@ -82,6 +82,60 @@ def get_transforms(mode='train', augmentations=None):
         if augmentations.get('BLUR', False):
             transforms_list.append(A.Blur(blur_limit=7, p=0.2))
 
+        if augmentations.get('CLAHE', False):
+            transforms_list.append(A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5))
+
+        if augmentations.get('SHARPEN', False):
+            transforms_list.append(A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=0.5))
+
+        if augmentations.get('COLOR_JITTER', False):
+            transforms_list.append(
+                A.ColorJitter(
+                    brightness=0.2,
+                    contrast=0.2,
+                    saturation=0.2,
+                    hue=0.1,
+                    p=0.5
+                )
+            )
+
+        if augmentations.get('ISO_NOISE', False):
+            transforms_list.append(
+                A.ISONoise(
+                    color_shift=(0.01, 0.05),
+                    intensity=(0.1, 0.5),
+                    p=0.5
+                )
+            )
+
+        if augmentations.get('GAUSSIAN_NOISE', False):
+            transforms_list.append(A.GaussNoise(var_limit=(10.0, 50.0), p=0.5))
+
+        if augmentations.get('RANDOM_SHADOW', False):
+            transforms_list.append(
+                A.RandomShadow(
+                    shadow_roi=(0, 0.5, 1, 1),
+                    num_shadows_lower=1,
+                    num_shadows_upper=3,
+                    shadow_dimension=5,
+                    p=0.5
+                )
+            )
+
+        if augmentations.get('RANDOM_SUNFLARE', False):
+            transforms_list.append(
+                A.RandomSunFlare(
+                    flare_roi=(0, 0, 1, 0.5),
+                    angle_lower=0,
+                    angle_upper=1,
+                    num_flare_circles_lower=6,
+                    num_flare_circles_upper=10,
+                    src_radius=400,
+                    src_color=(255, 255, 255),
+                    p=0.3
+                )
+            )
+
         if augmentations.get('NORMALIZE', False):
             transforms_list.append(A.Normalize(mean=mean, std=std))
             

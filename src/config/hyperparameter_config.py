@@ -65,15 +65,19 @@ AUGMENTATION_EXPERIMENTS = {
             'TRAIN': {
                 'RESIZE': True,
                 # Spatial
-                'D4': True,
-                'CROP': True,
-                'SHIFT_SCALE_ROTATE': True,
-                'DISTORTION': True,
-                'DROP_OUT': True,
+                'SHIFT_SCALE_ROTATE': True,  # Keep this
+                'DROP_OUT': True,  # Keep this Val-IOU: 0.8258
                 # Pixel
                 'BRIGHTNESS_CONTRAST': True,
                 'BLUR': True,
                 'RANDOM_GAMMA': True,
+                'CLAHE': True,  # Contrast Limited Adaptive Histogram Equalization
+                'SHARPEN': True,  # Image sharpening
+                'COLOR_JITTER': True,  # Random changes in saturation and hue
+                'ISO_NOISE': True,  # Simulate camera ISO noise
+                'GAUSSIAN_NOISE': True,  # Add random gaussian noise
+                'RANDOM_SHADOW': True,  # Add random shadows (helpful for building detection)
+                'RANDOM_SUNFLARE': True,  # Simulate sun flare effects
                 'NORMALIZE': True
             },
             'VAL_TEST': {

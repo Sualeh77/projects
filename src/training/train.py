@@ -28,6 +28,42 @@ class CombinedLoss(nn.Module):
         dice_loss = self.dice(probs, targets)
         return dice_loss + ce_loss
 
+class EarlyStopping:
+    def __init__(self, patience=7, min_delta=1e-4, mode='max'):
+        """
+        Args:
+            patience (int): Number of epochs to wait before stopping
+            min_delta (float): Minimum change in monitored value to qualify as an improvement
+            mode (str): 'min' for loss, 'max' for metrics like IoU
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.mode = mode
+        self.counter = 0
+        self.best_value = None
+        self.early_stop = False
+        self.min_delta *= 1 if mode == 'max' else -1
+
+    def __call__(self, current_value):
+        if self.best_value is None:
+            self.best_value = current_value
+            return False
+
+        if self.mode == 'max':
+            delta = current_value - self.best_value
+        else:
+            delta = self.best_value - current_value
+
+        if delta > self.min_delta:
+            self.best_value = current_value
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+
+        return self.early_stop
+
 class Trainer:
     def __init__(
         self,
@@ -163,9 +199,16 @@ class Trainer:
                 self.start_epoch = self.load_checkpoint(latest_checkpoint)
                 print(f"Resuming from epoch {self.start_epoch}")
         
+        self.early_stopping = EarlyStopping(
+            patience=7,  # Stop if no improvement for 7 epochs
+            min_delta=0.0005,  # Minimum IoU improvement of 0.05%
+            mode='max'
+        )
+        
     def train(self):
         """Main training loop"""
         best_val_loss = float('inf')
+        best_val_iou = 0.0
         
         for epoch in range(self.start_epoch, self.num_epochs):
             print(f"\nEpoch {epoch+1}/{self.num_epochs}")
@@ -189,6 +232,15 @@ class Trainer:
                     self.device
                 )
                 
+                # Get building IoU for early stopping
+                val_building_iou = val_metrics.get('IoU_Building', 0.0)
+                
+                # Check early stopping
+                if self.early_stopping(val_building_iou):
+                    print(f"\nEarly stopping triggered at epoch {epoch+1}")
+                    print(f"Best validation Building IoU: {self.early_stopping.best_value:.4f}")
+                    break
+                
                 # Update logs
                 self.logger.update_logs(
                     train_metrics,
@@ -197,9 +249,8 @@ class Trainer:
                 )
                 
                 # Save best model
-                val_loss = val_metrics['loss'] if isinstance(val_metrics, dict) else val_metrics
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
+                if val_building_iou > best_val_iou:
+                    best_val_iou = val_building_iou
                     self.save_checkpoint(is_best=True)
                 
                 # Save checkpoint every epoch
