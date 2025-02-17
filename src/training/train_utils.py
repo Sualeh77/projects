@@ -70,7 +70,7 @@ class TrainingLogger:
         with open(log_path, 'w') as f:
             json.dump(log_data, f, indent=4)
 
-def train_epoch(model, data_loader, criterion, optimizer, device, scheduler=None):
+def train_epoch(model, data_loader, criterion, optimizer, device, scheduler=None, gradient_accumulation_steps=1):
     """Train model for one epoch"""
     model.train()
     running_loss = 0.0
@@ -81,28 +81,31 @@ def train_epoch(model, data_loader, criterion, optimizer, device, scheduler=None
     start_time = time.time()
     num_batches = len(data_loader)
     
+    optimizer.zero_grad()  # Move zero_grad outside the batch loop
+    
     progress_bar = tqdm(data_loader, desc='Training')
     for batch_idx, (images, masks) in enumerate(progress_bar):
         images = images.to(device)
         masks = masks.to(device)
         
-        # Zero the parameter gradients
-        optimizer.zero_grad()
-        
         # Forward pass
         outputs = model(images)
         loss = criterion(outputs, masks)
+        # Normalize loss for gradient accumulation
+        loss = loss / gradient_accumulation_steps
         
         # Backward pass and optimize
         loss.backward()
-        optimizer.step()
-        
-        # Step scheduler if it's OneCycleLR
-        if scheduler is not None:
-            scheduler.step()
+        # Only update weights after accumulating enough gradients
+        if (batch_idx + 1) % gradient_accumulation_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            # Step scheduler if it's OneCycleLR
+            if scheduler is not None:
+                scheduler.step()
         
         # Update metrics
-        batch_loss = loss.item()
+        batch_loss = loss.item() * gradient_accumulation_steps  # Scale loss back for logging
         
         # Skip abnormal loss values
         if not np.isfinite(batch_loss) or batch_loss > 100:

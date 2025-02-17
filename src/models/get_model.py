@@ -45,6 +45,18 @@ def get_model(architecture, encoder, encoder_weights=None, encoder_depth=5,
             classes=classes,
             activation=activation
         )
+    elif architecture.lower() == 'segformer':
+        model = smp.Segformer(
+            encoder_name=encoder,
+            encoder_weights=encoder_weights,
+            encoder_depth=encoder_depth,
+            decoder_channels=decoder_channels,
+            decoder_use_batchnorm=decoder_use_batchnorm,
+            decoder_attention_type=decoder_attention_type,
+            in_channels=in_channels,
+            classes=classes,
+            activation=activation
+        )
     else:
         raise ValueError(f"Unsupported architecture: {architecture}")
     

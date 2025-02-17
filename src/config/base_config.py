@@ -42,20 +42,29 @@ DATASET = {
 }
 
 # Augmentation Configuration
+# keeping only basic pixel-level augmentations as it performed best.
 AUGMENTATION = {
     'TRAIN': {
         'RESIZE': True,
-        # 'HORIZONTAL_FLIP': True,
-        # 'VERTICAL_FLIP': True,
-        # 'RANDOM_ROTATE': True,
-        # 'COLOR_JITTER': True,
-        # 'BRIGHTNESS': 0.2,
-        # 'CONTRAST': 0.2,
-        'NORMALIZE': True,
+        # Spatial
+        # 'SHIFT_SCALE_ROTATE': True,  # Keep this
+        # 'DROP_OUT': True,  # Keep this Val-IOU: 0.8258
+        # Pixel
+        'BRIGHTNESS_CONTRAST': True,
+        'BLUR': True,
+        'RANDOM_GAMMA': True,
+        # 'CLAHE': True,  # Contrast Limited Adaptive Histogram Equalization
+        # 'SHARPEN': True,  # Image sharpening
+        # 'COLOR_JITTER': True,  # Random changes in saturation and hue
+        # 'ISO_NOISE': True,  # Simulate camera ISO noise
+        # 'GAUSSIAN_NOISE': True,  # Add random gaussian noise
+        # 'RANDOM_SHADOW': True,  # Add random shadows (helpful for building detection)
+        # 'RANDOM_SUNFLARE': True,  # Simulate sun flare effects
+        'NORMALIZE': True
     },
     'VAL_TEST': {
         'RESIZE': True,
-        'NORMALIZE': True,
+        'NORMALIZE': True
     }
 }
 
@@ -64,8 +73,8 @@ MODEL = {
     'ENCODER_DEPTH':5,
     'ENCODER_WEIGHTS': None,
     'DECODER_CHANNELS': [256, 128, 64, 32, 16],
-    'DECODER_USE_BATCHNORM': False,
-    'DECODER_ATTENTION_TYPE': None, # 'scse', 'cbam', 'se', 'none'
+    'DECODER_USE_BATCHNORM': True,
+    'DECODER_ATTENTION_TYPE': None,  # scse, cbam, se, none
     'IN_CHANNELS': 3,
     'ACTIVATION': None, # Keep as None since we handle activations in loss function
 }
@@ -135,12 +144,55 @@ EXPERIMENTS = {
     }
 }
 
+BENCHMARK_EXPERIMENTS = {
+    'unet_resnet101_benchmark': {
+        'id': 'unet_resnet101_benchmark',
+        'name': 'UNet with ResNet101 Encoder (Benchmark)',
+        'architecture': 'Unet',
+        'encoder': 'resnet101',
+        'encoder_depth': MODEL['ENCODER_DEPTH'],
+        'encoder_weights': MODEL['ENCODER_WEIGHTS'],
+        'decoder_channels': MODEL['DECODER_CHANNELS'],
+        'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
+        'in_channels': MODEL['IN_CHANNELS'],
+        'activation': MODEL['ACTIVATION']
+    },
+    'unetpp_resnet50_benchmark': {
+        'id': 'unetpp_resnet50_benchmark',
+        'name': 'UNet++ with ResNet50 Encoder (Benchmark)', 
+        'architecture': 'UnetPlusPlus',
+        'encoder': 'resnet50', # since resnet50 in unet++ has 50M parameters equivalent to resnet101 in unet
+        'encoder_depth': MODEL['ENCODER_DEPTH'],
+        'encoder_weights': MODEL['ENCODER_WEIGHTS'],
+        'decoder_channels': MODEL['DECODER_CHANNELS'],
+        'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
+        'in_channels': MODEL['IN_CHANNELS'],
+        'activation': MODEL['ACTIVATION']
+    },
+    'segformer_b3_benchmark': {
+        'id': 'segformer_b3_benchmark',
+        'name': 'SegFormer-B3 (Benchmark)',
+        'architecture': 'SegFormer',
+        'encoder': 'mit_b3',
+        'encoder_depth': MODEL['ENCODER_DEPTH'],
+        'encoder_weights': MODEL['ENCODER_WEIGHTS'],
+        'decoder_channels': 256,
+        'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
+        'in_channels': MODEL['IN_CHANNELS'],
+        'activation': MODEL['ACTIVATION']
+    }
+}
+
 # Training Configuration
 TRAINING = {
-    'BATCH_SIZE': 8,
-    'NUM_EPOCHS': 10,
+    'BATCH_SIZE': 4,
+    'GRADIENT_ACCUMULATION_STEPS': 2,  # Simulate batch_size of 8
+    'NUM_EPOCHS': 50,
     'LEARNING_RATE': 0.001, # 1e-3
-    'MAX_LR': 1.08e-03, # Found from find_optimal_lr for one cycle scheduler, perfromed best.
+    'MAX_LR': 1.32E-03, # Found from find_optimal_lr for one cycle scheduler, perfromed best.
     'OPTIMIZER': 'adamw',
     'optim_params': {
             'betas': (0.9, 0.999),

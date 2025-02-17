@@ -90,6 +90,10 @@ class Trainer:
         self.exp_id = exp_id
         self.hyper_params_experiment = hyper_params_experiment
         self.training_config = training_config
+        
+        # Initialize scaler only for CUDA devices
+        self.scaler = torch.cuda.amp.GradScaler() if device.type == 'cuda' else None
+        
         # Initialize criterion using smp for multi-class segmentation
         if TRAINING['LOSS_FUNCTION'] == 'DiceLoss+CrossEntropyLoss':
             self.criterion = CombinedLoss(ignore_background=ignore_background)
@@ -138,6 +142,7 @@ class Trainer:
             self.log_dir = os.path.join(log_dir, exp_id, hyper_params_experiment)
         else:
             self.log_dir = os.path.join(log_dir, exp_id)
+        os.makedirs(self.log_dir, exist_ok=True)
         self.logger = TrainingLogger(self.log_dir)
         
         # Attach logger to model for batch-level logging
@@ -209,6 +214,11 @@ class Trainer:
         """Main training loop"""
         best_val_loss = float('inf')
         best_val_iou = 0.0
+        train_losses, val_losses = [], []
+        train_metrics_history, val_metrics_history = [], []
+        epoch_times = []
+        
+        gradient_accumulation_steps = self.training_config.get('GRADIENT_ACCUMULATION_STEPS', 1)
         
         for epoch in range(self.start_epoch, self.num_epochs):
             print(f"\nEpoch {epoch+1}/{self.num_epochs}")
@@ -220,7 +230,8 @@ class Trainer:
                 self.criterion,
                 self.optimizer,
                 self.device,
-                self.scheduler if self.training_config['SCHEDULER'] == 'one_cycle' else None
+                self.scheduler if self.training_config['SCHEDULER'] == 'one_cycle' else None,
+                gradient_accumulation_steps
             )
             
             try:

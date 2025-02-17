@@ -71,13 +71,13 @@ AUGMENTATION_EXPERIMENTS = {
                 'BRIGHTNESS_CONTRAST': True,
                 'BLUR': True,
                 'RANDOM_GAMMA': True,
-                'CLAHE': True,  # Contrast Limited Adaptive Histogram Equalization
-                'SHARPEN': True,  # Image sharpening
-                'COLOR_JITTER': True,  # Random changes in saturation and hue
-                'ISO_NOISE': True,  # Simulate camera ISO noise
-                'GAUSSIAN_NOISE': True,  # Add random gaussian noise
-                'RANDOM_SHADOW': True,  # Add random shadows (helpful for building detection)
-                'RANDOM_SUNFLARE': True,  # Simulate sun flare effects
+                # 'CLAHE': True,  # Contrast Limited Adaptive Histogram Equalization
+                # 'SHARPEN': True,  # Image sharpening
+                # 'COLOR_JITTER': True,  # Random changes in saturation and hue
+                # 'ISO_NOISE': True,  # Simulate camera ISO noise
+                # 'GAUSSIAN_NOISE': True,  # Add random gaussian noise
+                # 'RANDOM_SHADOW': True,  # Add random shadows (helpful for building detection)
+                # 'RANDOM_SUNFLARE': True,  # Simulate sun flare effects
                 'NORMALIZE': True
             },
             'VAL_TEST': {

@@ -9,5 +9,36 @@ bfp-segmentation/logs/
 bfp-segmentation/checkpoints/
 
 # Python cache files
+*.py[cod]
+__pycache__/
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+
+# Project specific
 **/__pycache__/
 **/*.pyc
+src/__pycache__/__init__.cpython-39.pyc
+src/__pycache__/app.cpython-310.pyc
+src/__pycache__/config.cpython-310.pyc
+src/__pycache__/inference.cpython-310.pyc
+src/config/__pycache__/base_config.cpython-310.pyc
+src/config/__pycache__/hyperparameter_config.cpython-310.pyc
+src/models/__pycache__/get_model.cpython-310.pyc
+src/training/__pycache__/run_experiment.cpython-310.pyc
+src/training/__pycache__/train.cpython-310.pyc
+src/training/__pycache__/train_utils.cpython-310.pyc
+src/utils/__pycache__/utils.cpython-310.pyc

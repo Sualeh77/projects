@@ -1,7 +1,10 @@
 from flask import Flask, render_template, jsonify, send_file, request
 import os
 import json
-from src.config.base_config import WEBAPP, TRAINING, MODEL, AUGMENTATION, DATASET, LOGS_DIR, EXPERIMENTS
+from src.config.base_config import (
+    WEBAPP, TRAINING, MODEL, AUGMENTATION, DATASET, LOGS_DIR, 
+    EXPERIMENTS, BENCHMARK_EXPERIMENTS
+)
 from src.models.get_model import get_model, count_parameters
 from src.config.hyperparameter_config import (
     BASE_MODEL_ID, 
@@ -430,21 +433,29 @@ def get_hyperparameter_experiments():
     print(f"Returning data: {all_data}")
     return jsonify(all_data)
 
-def get_model_metrics(model_id):
+def get_model_metrics(model_id, is_benchmark=False):
     """Get metrics for a specific model from its test_metrics.json file"""
-    metrics_path = os.path.join(LOGS_DIR, model_id, 'test_metrics.json')
+    # Determine the correct path based on whether it's a benchmark experiment
+    if is_benchmark:
+        metrics_path = os.path.join(LOGS_DIR, 'benchmark', model_id, 'test_metrics.json')
+    else:
+        metrics_path = os.path.join(LOGS_DIR, model_id, 'test_metrics.json')
+    print(f"Looking for metrics at: {metrics_path}")
+
     if os.path.exists(metrics_path):
+        print(f"Found metrics file for {model_id}")
         with open(metrics_path, 'r') as f:
             metrics = json.load(f)
-            return {
-                'iou_building': metrics.get('IoU_Building', 0),
-                'f1_building': metrics.get('F1_Score_Building', 0),
-                'training_time': 0  # Will be updated from training logs
-            }
+            print(f"Loaded metrics for {model_id}: {metrics}")
+            return metrics  # Return the full metrics object
+    else:
+        print(f"No metrics file found for {model_id}")
     return {
-        'iou_building': 0,
-        'f1_building': 0,
-        'training_time': 0
+        'IoU_Building': 0,
+        'F1_Score_Building': 0,
+        'Accuracy_Building': 0,
+        'Precision_Building': 0,
+        'Recall_Building': 0
     }
 
 @app.route('/model-comparison')
@@ -452,6 +463,17 @@ def model_comparison():
     try:
         # Get base model config (UNet with best hyperparameters)
         base_config = EXPERIMENTS[BASE_MODEL_ID]
+        
+        # Get benchmark experiments
+        benchmark_experiments = []
+        for exp_id, exp_config in BENCHMARK_EXPERIMENTS.items():
+            print(f"Adding experiment: {exp_id}, {exp_config['name']}")  # Debug print
+            benchmark_experiments.append({
+                'name': exp_config['name'],
+                'id': exp_config['id']  # Make sure we're using the correct ID
+            })
+        
+        print(f"Benchmark experiments: {benchmark_experiments}")  # Debug print
         
         # Get training time from logs
         log_path = os.path.join(LOGS_DIR, BASE_MODEL_ID, 'training_logs.json')
@@ -478,6 +500,7 @@ def model_comparison():
         
         return render_template('model_comparison.html', 
                              base_model=base_model,
+                             experiments=benchmark_experiments,
                              base_metrics_json=json.dumps(metrics))
     except Exception as e:
         print(f"Error loading model comparison page: {str(e)}")
@@ -502,58 +525,39 @@ def model_comparison():
 
 @app.route('/get_model_comparison_data')
 def get_model_comparison_data():
-    all_data = {}
+    experiment_type = request.args.get('type', 'default')
+    print(f"\nFetching data for experiment type: {experiment_type}")
     
-    # Add base model data
-    base_log_path = os.path.join(LOGS_DIR, BASE_MODEL_ID, 'training_logs.json')
-    if os.path.exists(base_log_path):
-        with open(base_log_path, 'r') as f:
-            base_logs = json.load(f)
-            all_data['base_model'] = {
-                'name': 'Base UNet',
-                'train_losses': base_logs.get('train_losses', []),
-                'val_losses': base_logs.get('val_losses', []),
-                'train_metrics': base_logs.get('train_metrics', {}),
-                'val_metrics': base_logs.get('val_metrics', {}),
-                'test_metrics': get_model_metrics(BASE_MODEL_ID)
-            }
+    if experiment_type == 'benchmark':
+        experiments_config = BENCHMARK_EXPERIMENTS
+        base_path = os.path.join(LOGS_DIR, 'benchmark')
+        print(f"Using benchmark experiments: {list(experiments_config.keys())}")
+        print(f"Looking in path: {base_path}")
+    else:
+        experiments_config = EXPERIMENTS
+        base_path = LOGS_DIR
     
-    # Add data for each model architecture
-    for model_id, model_config in EXPERIMENTS.items():
-        if model_id == BASE_MODEL_ID:
-            continue
-            
-        try:
-            model_data = {
-                'name': model_config['name'],
-                'train_losses': [],
-                'val_losses': [],
-                'train_metrics': {},
-                'val_metrics': {},
-                'test_metrics': None
-            }
-            
-            # Get training logs
-            log_path = os.path.join(LOGS_DIR, model_id, 'training_logs.json')
-            if os.path.exists(log_path):
-                with open(log_path, 'r') as f:
-                    logs = json.load(f)
-                    model_data.update({
-                        'train_losses': logs.get('train_losses', []),
-                        'val_losses': logs.get('val_losses', []),
-                        'train_metrics': logs.get('train_metrics', {}),
-                        'val_metrics': logs.get('val_metrics', {})
-                    })
-            
-            # Get test metrics
-            model_data['test_metrics'] = get_model_metrics(model_id)
-            all_data[model_id] = model_data
-            
-        except Exception as e:
-            print(f"Error processing model {model_id}: {str(e)}")
-            continue
+    data = {}
+    for exp_id, exp_config in experiments_config.items():
+        exp_log_path = os.path.join(base_path, exp_id, 'training_logs.json')
+        print(f"\nChecking for logs at: {exp_log_path}")
+        if os.path.exists(exp_log_path):
+            print(f"Found logs for {exp_id}")
+            with open(exp_log_path, 'r') as f:
+                log_data = json.load(f)
+                data[exp_id] = {
+                    'name': exp_config['name'],
+                    'train_losses': log_data['train_losses'],
+                    'val_losses': log_data['val_losses'],
+                    'train_metrics': log_data['train_metrics'],
+                    'val_metrics': log_data['val_metrics'],
+                    'test_metrics': get_model_metrics(exp_id, experiment_type == 'benchmark')
+                }
+        else:
+            print(f"No logs found for {exp_id}")
     
-    return jsonify(all_data)
+    print(f"\nReturning data for models: {list(data.keys())}")
+    return jsonify(data)
 
 if __name__ == '__main__':
     app.run(

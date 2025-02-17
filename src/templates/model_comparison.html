@@ -40,14 +40,6 @@
                         {% endfor %}
                     </ul>
                 </div>
-                <div class="info-card">
-                    <h3>Base Model Performance</h3>
-                    <ul>
-                        <li><strong>Building IoU:</strong> {{ "%.4f"|format(base_model.metrics.iou_building) }}</li>
-                        <li><strong>F1 Score:</strong> {{ "%.4f"|format(base_model.metrics.f1_building) }}</li>
-                        <li><strong>Training Time:</strong> {{ base_model.metrics.training_time }} minutes</li>
-                    </ul>
-                </div>
             </div>
         </section>
 
@@ -59,11 +51,17 @@
             <div class="comparison-card">
                 <div class="section-header">
                     <h3>Training Progress Comparison</h3>
-                    <button class="fancy-button update-btn" id="updateModelCharts">Update Charts</button>
+                    <div class="chart-controls">
+                        <div class="toggle-group">
+                            <button class="toggle-btn active" data-show="both">Both</button>
+                            <button class="toggle-btn" data-show="train">Training</button>
+                            <button class="toggle-btn" data-show="val">Validation</button>
+                        </div>
+                        <button class="fancy-button update-btn" id="updateModelCharts">Update Charts</button>
+                    </div>
                 </div>
-                <div class="chart-container">
-                    <div id="modelTrainingChart" class="chart"></div>
-                    <div id="modelValidationChart" class="chart"></div>
+                <div class="comparison-charts">
+                    <div id="modelComparisonChart" class="chart"></div>
                 </div>
                 <div class="metrics-table-container">
                     <h4>Building Segmentation Metrics</h4>

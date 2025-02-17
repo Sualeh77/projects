@@ -68,7 +68,7 @@ def get_transforms(mode='train', augmentations=None):
             transforms_list.append(
                 A.OneOf([
                     A.GridDropout(ratio=0.05),
-                    A.CoarseDropout(num_holes_range=(1, 5), max_height=2, max_width=2, fill_mask=0, p=1),
+                    A.CoarseDropout(num_holes_range=(1, 5), fill_mask=0, p=1),
                     A.PixelDropout(p=1, dropout_prob=0.05)
                 ], p=0.05)
             )
@@ -83,10 +83,10 @@ def get_transforms(mode='train', augmentations=None):
             transforms_list.append(A.Blur(blur_limit=7, p=0.2))
 
         if augmentations.get('CLAHE', False):
-            transforms_list.append(A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5))
+            transforms_list.append(A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.05))
 
         if augmentations.get('SHARPEN', False):
-            transforms_list.append(A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=0.5))
+            transforms_list.append(A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=0.05))
 
         if augmentations.get('COLOR_JITTER', False):
             transforms_list.append(
@@ -95,7 +95,7 @@ def get_transforms(mode='train', augmentations=None):
                     contrast=0.2,
                     saturation=0.2,
                     hue=0.1,
-                    p=0.5
+                    p=0.1
                 )
             )
 
@@ -104,21 +104,19 @@ def get_transforms(mode='train', augmentations=None):
                 A.ISONoise(
                     color_shift=(0.01, 0.05),
                     intensity=(0.1, 0.5),
-                    p=0.5
+                    p=0.1
                 )
             )
 
         if augmentations.get('GAUSSIAN_NOISE', False):
-            transforms_list.append(A.GaussNoise(var_limit=(10.0, 50.0), p=0.5))
+            transforms_list.append(A.GaussNoise(p=0.1))
 
         if augmentations.get('RANDOM_SHADOW', False):
             transforms_list.append(
                 A.RandomShadow(
                     shadow_roi=(0, 0.5, 1, 1),
-                    num_shadows_lower=1,
-                    num_shadows_upper=3,
-                    shadow_dimension=5,
-                    p=0.5
+                    num_shadows_limit=(1, 2),
+                    p=0.05
                 )
             )
 
@@ -126,13 +124,11 @@ def get_transforms(mode='train', augmentations=None):
             transforms_list.append(
                 A.RandomSunFlare(
                     flare_roi=(0, 0, 1, 0.5),
-                    angle_lower=0,
-                    angle_upper=1,
-                    num_flare_circles_lower=6,
-                    num_flare_circles_upper=10,
+                    angle_range=(0, 1),
+                    num_flare_circles_range=(6, 10),
                     src_radius=400,
                     src_color=(255, 255, 255),
-                    p=0.3
+                    p=0.05
                 )
             )
 

@@ -7,13 +7,16 @@ import segmentation_models_pytorch as smp
 from datasets.custom_datasets.spacenet_dataset import CustomSpacenetDataset
 from training.train import Trainer
 from src.utils.utils import compute_mean_std, get_transforms
-from src.config.base_config import MODEL, TRAINING, DATASET, DEVICE, AUGMENTATION, LOGS_DIR, EXPERIMENTS
+from src.config.base_config import (
+    MODEL, TRAINING, DATASET, DEVICE, AUGMENTATION, LOGS_DIR, 
+    EXPERIMENTS, BENCHMARK_EXPERIMENTS
+)
 from src.models.get_model import get_model
 import os
 import argparse
 
 
-def run_experiment(model_conf, training_config=None, learning_rate=None, optimizer=None, scheduler=None, resume=False):
+def run_experiment(model_conf, training_config=None, learning_rate=None, optimizer=None, scheduler=None, resume=False, log_dir=None):
     device = DEVICE
     
     # Override training config with hyperparameter settings if provided
@@ -84,7 +87,7 @@ def run_experiment(model_conf, training_config=None, learning_rate=None, optimiz
         learning_rate=training_config['LEARNING_RATE'],
         num_epochs=training_config['NUM_EPOCHS'],
         optimizer=training_config['OPTIMIZER'],
-        log_dir=LOGS_DIR,
+        log_dir=log_dir if log_dir else LOGS_DIR,
         ignore_background=training_config['IGNORE_BACKGROUND'],
         training_config=training_config,
         resume=resume
@@ -97,6 +100,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run training experiment')
     parser.add_argument('--exp_id', type=str, required=True, 
                       help='Experiment ID from config.py (e.g., unet_resnet18, unet_resnet34)')
+    parser.add_argument('--benchmark', action='store_true',
+                      help='Use benchmark experiments configuration')
     
     # Add optional hyperparameter arguments
     parser.add_argument('--learning_rate', type=float, help='Override learning rate')
@@ -106,14 +111,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Get experiment config
-    if args.exp_id in EXPERIMENTS:
-        model_config = EXPERIMENTS[args.exp_id]
+    experiments_dict = BENCHMARK_EXPERIMENTS if args.benchmark else EXPERIMENTS
+    if args.exp_id in experiments_dict:
+        model_config = experiments_dict[args.exp_id]
         print(f"Running experiment: {model_config['name']}")
     else:
-        raise ValueError(f"Invalid experiment ID: {args.exp_id}")
+        raise ValueError(f"Invalid {'benchmark ' if args.benchmark else ''}experiment ID: {args.exp_id}")
 
     # Create experiment directory
-    experiment_dir = os.path.join(LOGS_DIR, args.exp_id)
+    if args.benchmark:
+        experiment_dir = os.path.join(LOGS_DIR, 'benchmark', args.exp_id)
+    else:
+        experiment_dir = os.path.join(LOGS_DIR, args.exp_id)
     os.makedirs(experiment_dir, exist_ok=True)
 
     # To suppress specific CUDA/GPU related warnings
@@ -124,5 +133,6 @@ if __name__ == '__main__':
         model_conf=model_config, 
         learning_rate=args.learning_rate,
         optimizer=args.optimizer,
-        scheduler=args.scheduler
+        scheduler=args.scheduler,
+        log_dir=experiment_dir
     )
