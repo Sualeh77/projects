@@ -10,6 +10,7 @@ from src.training.metrics import (
 )
 from collections import defaultdict
 import torch.optim as optim
+import torch.nn.functional as F
 
 class TrainingLogger:
     def __init__(self, log_dir):
@@ -74,53 +75,71 @@ def train_epoch(model, data_loader, criterion, optimizer, device, scheduler=None
     """Train model for one epoch"""
     model.train()
     running_loss = 0.0
-    valid_batches = 0  # Counter for valid loss batches
+    valid_batches = 0
     metrics = SegmentationMetrics()
     all_metrics = []
-    
     start_time = time.time()
     num_batches = len(data_loader)
     
-    optimizer.zero_grad()  # Move zero_grad outside the batch loop
+    # Check if this is a SegFormer model
+    is_segformer = hasattr(model, 'name') and 'segformer' in model.name
+    
+    optimizer.zero_grad()
     
     progress_bar = tqdm(data_loader, desc='Training')
     for batch_idx, (images, masks) in enumerate(progress_bar):
-        images = images.to(device)
-        masks = masks.to(device)
-        
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, masks)
-        # Normalize loss for gradient accumulation
-        loss = loss / gradient_accumulation_steps
-        
-        # Backward pass and optimize
-        loss.backward()
-        # Only update weights after accumulating enough gradients
-        if (batch_idx + 1) % gradient_accumulation_steps == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-            # Step scheduler if it's OneCycleLR
-            if scheduler is not None:
-                scheduler.step()
-        
-        # Update metrics
-        batch_loss = loss.item() * gradient_accumulation_steps  # Scale loss back for logging
-        
-        # Skip abnormal loss values
-        if not np.isfinite(batch_loss) or batch_loss > 100:
-            print(f"Warning: Skipping batch {batch_idx} due to abnormal loss value: {batch_loss}")
-            continue
+        try:
+            images = images.to(device)
+            masks = masks.to(device)
             
-        # Update metrics only for valid losses
-        running_loss += batch_loss
-        valid_batches += 1
-        
-        batch_metrics = metrics.update(outputs, masks)
-        all_metrics.append(batch_metrics)
-        
-        # Update progress bar
-        progress_bar.set_postfix({'loss': batch_loss, 'avg_loss': running_loss/valid_batches})
+            # Forward pass
+            outputs = model(images)
+            
+            # Handle SegFormer's output
+            if is_segformer:
+                # Reshape outputs to match mask dimensions
+                outputs = F.interpolate(
+                    outputs,
+                    size=masks.shape[-2:],
+                    mode='bilinear',
+                    align_corners=False
+                )
+                loss = criterion(outputs, masks)
+            else:
+                loss = criterion(outputs, masks)
+            
+            loss = loss / gradient_accumulation_steps
+            
+            # Backward pass
+            loss.backward()
+            
+            if (batch_idx + 1) % gradient_accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                
+                # Step scheduler if needed
+                if scheduler is not None:
+                    if isinstance(scheduler, optim.lr_scheduler.OneCycleLR):
+                        scheduler.step()
+            
+            # Update metrics
+            batch_loss = loss.item() * gradient_accumulation_steps
+            
+            if not np.isfinite(batch_loss) or batch_loss > 100:
+                print(f"Warning: Skipping batch {batch_idx} due to abnormal loss value: {batch_loss}")
+                continue
+            
+            running_loss += batch_loss
+            valid_batches += 1
+            
+            batch_metrics = metrics.update(outputs, masks)
+            all_metrics.append(batch_metrics)
+            
+            progress_bar.set_postfix({'loss': batch_loss, 'avg_loss': running_loss/valid_batches})
+            
+        except Exception as e:
+            print(f"Error in batch {batch_idx}: {e}")
+            continue
     
     # Calculate average loss using only valid batches
     avg_loss = running_loss / valid_batches if valid_batches > 0 else float('inf')
@@ -140,6 +159,9 @@ def validate(model, data_loader, criterion, device):
     metrics = SegmentationMetrics()
     all_metrics = []
     
+    # Check if this is a SegFormer model
+    is_segformer = hasattr(model, 'name') and 'segformer' in model.name
+    
     with torch.no_grad():
         for images, masks in tqdm(data_loader, desc='Validation'):
             images = images.to(device)
@@ -147,9 +169,20 @@ def validate(model, data_loader, criterion, device):
             
             # Forward pass
             outputs = model(images)
-            loss = criterion(outputs, masks)
             
-            # Update metrics
+            # Handle SegFormer's output
+            if is_segformer:
+                # Reshape outputs to match mask dimensions
+                outputs = F.interpolate(
+                    outputs,
+                    size=masks.shape[-2:],
+                    mode='bilinear',
+                    align_corners=False
+                )
+                loss = criterion(outputs, masks)
+            else:
+                loss = criterion(outputs, masks)
+            
             running_loss += loss.item()
             batch_metrics = metrics.update(outputs, masks)
             all_metrics.append(batch_metrics)
@@ -160,3 +193,17 @@ def validate(model, data_loader, criterion, device):
     epoch_metrics['loss'] = avg_loss  # Add loss to metrics dictionary
     
     return epoch_metrics 
+
+def mixup_data(x, y, alpha=0.2):
+    """Performs mixup on the input and target."""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size).to(x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index]
+    mixed_y = lam * y + (1 - lam) * y[index]
+    return mixed_x, mixed_y 

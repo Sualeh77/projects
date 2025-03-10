@@ -20,6 +20,65 @@
     </nav>
     
     <main>
+        <section class="upload-section">
+            <h2>Visualization Tool</h2>
+            <form class="upload-form" id="uploadForm">
+                <div>
+                    <label for="imageUpload">Upload Satellite Image:</label>
+                    <input type="file" id="imageUpload" accept="image/*" required>
+                </div>
+                <div>
+                    <label for="maskUpload">Upload Building Mask:</label>
+                    <input type="file" id="maskUpload" accept="image/*" required>
+                </div>
+                <button type="submit" class="fancy-button">Visualize</button>
+                <button type="button" id="runInference" class="fancy-button" disabled>Run Model Inference</button>
+            </form>
+            
+            <div class="visualization-container" id="visualizationContainer">
+                <div class="opacity-control">
+                    <label for="opacitySlider">Mask Opacity:</label>
+                    <input type="range" id="opacitySlider" class="opacity-slider" 
+                           min="0" max="100" value="50">
+                </div>
+                <div class="image-controls">
+                    <div class="control-group">
+                        <label for="brightnessSlider">Brightness:</label>
+                        <input type="range" id="brightnessSlider" class="control-slider" 
+                               min="0" max="200" value="100">
+                    </div>
+                    <div class="control-group">
+                        <label for="contrastSlider">Contrast:</label>
+                        <input type="range" id="contrastSlider" class="control-slider" 
+                               min="0" max="200" value="100">
+                    </div>
+                </div>
+                <div class="image-stack">
+                    <img class="base-image" id="baseImage">
+                    <img class="mask-overlay" id="maskOverlay">
+                    <div id="predictionOverlays"></div>
+                </div>
+                <div class="visualization-controls">
+                    <div class="mask-toggles">
+                        <h3>Mask Visibility</h3>
+                        <div class="toggle-group">
+                            <div class="toggle-item">
+                                <input type="checkbox" id="gtMaskToggle" checked>
+                                <label for="gtMaskToggle">Ground Truth</label>
+                            </div>
+                            <!-- Model toggles will be added here dynamically -->
+                        </div>
+                    </div>
+                    <div class="metrics-display">
+                        <h3>Model Performance</h3>
+                        <div id="iouMetrics"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <script src="{{ url_for('static', filename='js/visualization.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/model_inference.js') }}"></script>
 </body>
 </html> 

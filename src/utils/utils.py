@@ -16,6 +16,7 @@ def get_transforms(mode='train', augmentations=None):
     Get transformations for different modes
     Args:
         mode: 'train', 'val', or 'test'
+        augmentations: Dictionary of augmentation flags
     """
     mean, std = compute_mean_std(DATASET['TRAIN_IMAGES_DIR'])
 
@@ -27,7 +28,7 @@ def get_transforms(mode='train', augmentations=None):
             transforms_list.append(A.Resize(DATASET['IMAGE_SIZE'], DATASET['IMAGE_SIZE']))
             
         if augmentations.get('D4', False):
-            transforms_list.append(A.D4(p=0.5))
+            transforms_list.append(A.D4(p=0.7))
 
         if augmentations.get('CROP', False):
             transforms_list.append(
@@ -50,18 +51,18 @@ def get_transforms(mode='train', augmentations=None):
                         A.CropNonEmptyMaskIfExists(height=400, width=400, ignore_channels=[0, 2, 3]),
                         A.Resize(height=DATASET['IMAGE_SIZE'], width=DATASET['IMAGE_SIZE'])
                     ])
-                ], p=0.2)
+                ], p=0.5)
             )
 
         if augmentations.get('SHIFT_SCALE_ROTATE', False):
-            transforms_list.append(A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=45, p=0.3))
+            transforms_list.append(A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=45, p=0.5))
 
         if augmentations.get('DISTORTION', False):
             transforms_list.append(
                 A.OneOf([
                     A.GridDistortion(num_steps=10, distort_limit=0.2),
                     A.OpticalDistortion(distort_limit=0.5)
-                ], p=0.1)
+                ], p=0.5)
             )
 
         if augmentations.get('DROP_OUT', False):
@@ -70,23 +71,27 @@ def get_transforms(mode='train', augmentations=None):
                     A.GridDropout(ratio=0.05),
                     A.CoarseDropout(num_holes_range=(1, 5), fill_mask=0, p=1),
                     A.PixelDropout(p=1, dropout_prob=0.05)
-                ], p=0.05)
+                ], p=0.1)
             )
 
+        # Add new augmentations for SegFormer
+        if augmentations.get('RANDOM_SCALE', False):
+            transforms_list.append(A.RandomScale(scale_limit=(0.5, 2.0), p=0.5))
+
         if augmentations.get('RANDOM_GAMMA', False):
-            transforms_list.append(A.RandomGamma(gamma_limit=(50, 150), p=0.2))
+            transforms_list.append(A.RandomGamma(gamma_limit=(50, 150), p=0.5))
 
         if augmentations.get('BRIGHTNESS_CONTRAST', False):
-            transforms_list.append(A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.2))
+            transforms_list.append(A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5))
 
         if augmentations.get('BLUR', False):
-            transforms_list.append(A.Blur(blur_limit=7, p=0.2))
+            transforms_list.append(A.Blur(blur_limit=7, p=0.5))
 
         if augmentations.get('CLAHE', False):
-            transforms_list.append(A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.05))
+            transforms_list.append(A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5))
 
         if augmentations.get('SHARPEN', False):
-            transforms_list.append(A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=0.05))
+            transforms_list.append(A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=0.5))
 
         if augmentations.get('COLOR_JITTER', False):
             transforms_list.append(
@@ -95,7 +100,7 @@ def get_transforms(mode='train', augmentations=None):
                     contrast=0.2,
                     saturation=0.2,
                     hue=0.1,
-                    p=0.1
+                    p=0.5
                 )
             )
 
@@ -198,7 +203,7 @@ def compute_mean_std(images_dir):
     return tuple(mean), tuple(std)
 
 # Split SpaceNet data into train, validation and test sets
-def train_val_split(root_dir, save_dir, train_percent=0.7, val_percent=0.15):
+def train_val_split(root_dir, save_dir, train_percent=0.7, val_percent=0.15, format="npy", type="multi_channel"):
     # Create 'train' directory if it doesn't exist
     train_dir = os.path.join(root_dir, "train")
     if not os.path.exists(train_dir):
@@ -224,7 +229,7 @@ def train_val_split(root_dir, save_dir, train_percent=0.7, val_percent=0.15):
             os.makedirs(os.path.join(dir_path, "masks"))
 
     # List and shuffle all images
-    all_images = list(os.listdir(train_images_dir))
+    all_images = [f for f in os.listdir(train_images_dir) if f.endswith(f'.{format}')]
     np.random.shuffle(all_images)
 
     # Calculate split indices
@@ -241,16 +246,28 @@ def train_val_split(root_dir, save_dir, train_percent=0.7, val_percent=0.15):
     for img in tqdm(val_images):
         shutil.move(os.path.join(train_images_dir, img), 
                    os.path.join(val_dir, "images", img))
-        shutil.move(os.path.join(train_masks_dir, img.replace(".npy", "_multi_channel_mask.npy")), 
-                   os.path.join(val_dir, "masks", img.replace(".npy", "_multi_channel_mask.npy")))
+        if format == "npy":
+            mask_suffix = "_multi_channel_mask.npy" if type == "multi_channel" else "_mask.npy"
+            mask_name = img.replace(".npy", mask_suffix)
+        else:  # png format
+            mask_suffix = "_multi_channel_mask.png" if type == "multi_channel" else "_mask.png"
+            mask_name = img.replace(".png", mask_suffix)
+        shutil.move(os.path.join(train_masks_dir, mask_name), 
+                   os.path.join(val_dir, "masks", mask_name))
 
     # Move test images
     print("Moving test set...")
     for img in tqdm(test_images):
         shutil.move(os.path.join(train_images_dir, img), 
                    os.path.join(test_dir, "images", img))
-        shutil.move(os.path.join(train_masks_dir, img.replace(".npy", "_multi_channel_mask.npy")), 
-                   os.path.join(test_dir, "masks", img.replace(".npy", "_multi_channel_mask.npy")))
+        if format == "npy":
+            mask_suffix = "_multi_channel_mask.npy" if type == "multi_channel" else "_mask.npy"
+            mask_name = img.replace(".npy", mask_suffix)
+        else:  # png format
+            mask_suffix = "_multi_channel_mask.png" if type == "multi_channel" else "_mask.png"
+            mask_name = img.replace(".png", mask_suffix)
+        shutil.move(os.path.join(train_masks_dir, mask_name), 
+                   os.path.join(test_dir, "masks", mask_name))
 
 def find_optimal_lr(model, train_loader, criterion, optimizer, device, 
                    min_lr=1e-7, max_lr=10, num_iter=500, log_dir=None):
@@ -320,3 +337,45 @@ def find_optimal_lr(model, train_loader, criterion, optimizer, device,
     lr_finder.reset()
     
     return suggested_lr
+
+def replace_segformer_upsampling(model):
+    """
+    Replace SegFormer's bicubic upsampling with bilinear upsampling for MPS compatibility.
+    
+    Args:
+        model: The SegFormer model instance
+        
+    Returns:
+        The modified model
+    """
+    # Monkey patch the forward method of relevant modules
+    if hasattr(model, 'decode_head') and hasattr(model.decode_head, 'forward'):
+        original_forward = model.decode_head.forward
+        
+        def new_forward(self, *args, **kwargs):
+            # Call the original forward method
+            result = original_forward(*args, **kwargs)
+            
+            # If the result needs interpolation and we're using MPS
+            if hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                import torch.nn.functional as F
+                
+                # This assumes the result is a tensor or a tuple with tensor as first element
+                if isinstance(result, tuple):
+                    # If result is already a tuple, we need to modify the first element
+                    x = result[0]
+                    if hasattr(x, 'shape') and len(x.shape) == 4:  # Check if it's a 4D tensor (B,C,H,W)
+                        # Replace with bilinear upsampling if needed
+                        x = F.interpolate(x, scale_factor=4, mode='bilinear', align_corners=False)
+                        result = (x,) + result[1:]
+                elif hasattr(result, 'shape') and len(result.shape) == 4:
+                    # If result is a tensor, just modify it
+                    result = F.interpolate(result, scale_factor=4, mode='bilinear', align_corners=False)
+            
+            return result
+        
+        # Replace the forward method
+        import types
+        model.decode_head.forward = types.MethodType(new_forward, model.decode_head)
+    
+    return model

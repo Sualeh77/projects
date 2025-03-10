@@ -1,11 +1,19 @@
 from flask import Flask, render_template, jsonify, send_file, request
 import os
 import json
+import numpy as np
+from PIL import Image
+import torch
+from io import BytesIO
+import base64
 from src.config.base_config import (
     WEBAPP, TRAINING, MODEL, AUGMENTATION, DATASET, LOGS_DIR, 
-    EXPERIMENTS, BENCHMARK_EXPERIMENTS
+    EXPERIMENTS, BENCHMARK_EXPERIMENTS, DEVICE, CHECKPOINTS_DIR
 )
 from src.models.get_model import get_model, count_parameters
+from src.models.clipseg_model import CLIPSegPredictor
+from src.training.run_experiment import get_transforms
+from src.utils.post_processing import sharpen_building_masks
 from src.config.hyperparameter_config import (
     BASE_MODEL_ID, 
     LEARNING_RATE_EXPERIMENTS, 
@@ -558,6 +566,107 @@ def get_model_comparison_data():
     
     print(f"\nReturning data for models: {list(data.keys())}")
     return jsonify(data)
+
+@app.route('/run_inference', methods=['POST'])
+def run_inference():
+    if 'image' not in request.files or 'mask' not in request.files:
+        return jsonify({'error': 'Both image and mask must be provided'}), 400
+    
+    try:
+        # Read uploaded files
+        image = Image.open(request.files['image'])
+        gt_mask = Image.open(request.files['mask'])
+        
+        # Preprocess image
+        transform = get_transforms(mode='test', augmentations=TRAINING['AUGMENTATION']['VAL_TEST'])
+        image_tensor = transform(image=np.array(image))['image'].unsqueeze(0).to(DEVICE)
+        
+        # Convert ground truth mask to numpy
+        gt_mask = np.array(gt_mask)
+        if len(gt_mask.shape) == 3:
+            gt_mask = gt_mask[:,:,0]  # Take first channel if RGB
+        gt_mask = (gt_mask > 0).astype(np.uint8)  # Binarize
+        
+        # Store original mask size for later resizing
+        original_size = gt_mask.shape[:2]  # (height, width)
+        
+        results = {'predictions': {}}
+        
+        # Run inference for each benchmark model
+        for model_name, config in BENCHMARK_EXPERIMENTS.items():
+            # Load model
+            if model_name == 'clipseg':
+                model = CLIPSegPredictor(device=DEVICE)
+            else:
+                # Match the exact parameters expected by get_model()
+                model_params = {
+                    'architecture': config['architecture'],
+                    'encoder': config['encoder'],
+                    'encoder_weights': config.get('encoder_weights', None),
+                    'encoder_depth': config.get('encoder_depth', 5),
+                    'decoder_channels': config.get('decoder_channels', (256, 128, 64, 32, 16)),
+                    'decoder_use_batchnorm': config.get('decoder_use_batchnorm', False),
+                    'decoder_attention_type': config.get('decoder_attention_type', None),
+                    'in_channels': MODEL['IN_CHANNELS'],
+                    'classes': DATASET['NUM_CLASSES'],
+                    'activation': config.get('activation', None),
+                    'decoder_atrous_rates': config.get('decoder_atrous_rates', None),
+                    'decoder_aspp_separable': config.get('decoder_aspp_separable', None),
+                    'decoder_aspp_dropout': config.get('decoder_aspp_dropout', None)
+                }
+                model = get_model(**model_params).to(DEVICE)
+                checkpoint = torch.load(
+                    os.path.join(CHECKPOINTS_DIR, 'benchmark', model_name, 'best_model.pth'),
+                    map_location=DEVICE,
+                    weights_only=False
+                )
+                model.load_state_dict(checkpoint['model_state_dict'])
+                model.eval()
+            
+            # Get prediction
+            with torch.no_grad():
+                if model_name == 'clipseg':
+                    pred_mask = model.predict(image_tensor[0])
+                else:
+                    outputs = model(image_tensor)
+                    pred_mask = torch.argmax(outputs, dim=1)[0].cpu().numpy()
+                    pred_mask = (pred_mask == DATASET['CLASS_LABELS'].index('Building')).astype(np.uint8)
+            
+            # Post-process if configured
+            if config.get('post_process', False):
+                pred_mask = sharpen_building_masks(pred_mask, building_class_idx=1)
+            
+            # Resize prediction to match ground truth size
+            pred_mask = Image.fromarray(pred_mask).resize(
+                (original_size[1], original_size[0]),  # PIL uses (width, height)
+                Image.Resampling.NEAREST  # Use nearest neighbor to preserve binary values
+            )
+            pred_mask = np.array(pred_mask)
+            
+            # Compute IoU
+            intersection = np.logical_and(pred_mask, gt_mask).sum()
+            union = np.logical_or(pred_mask, gt_mask).sum()
+            iou = float(intersection) / (union + 1e-6)
+            
+            # Save mask image
+            # Create RGBA image with transparent background
+            rgba_mask = np.zeros((pred_mask.shape[0], pred_mask.shape[1], 4), dtype=np.uint8)
+            rgba_mask[pred_mask == 1] = [255, 255, 255, 255]  # White with full opacity for buildings
+            rgba_mask[pred_mask == 0] = [0, 0, 0, 0]  # Transparent for background
+            mask_img = Image.fromarray(rgba_mask, mode='RGBA')
+            mask_buffer = BytesIO()
+            mask_img.save(mask_buffer, format='PNG', optimize=True)
+            mask_url = 'data:image/png;base64,' + base64.b64encode(mask_buffer.getvalue()).decode()
+            
+            results['predictions'][model_name] = {
+                'mask_url': mask_url,
+                'iou': iou
+            }
+        
+        return jsonify(results)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(

@@ -117,7 +117,7 @@ class SpaceNetDataConverter:
         return polyMasks
 
 # Please use this function to split SpaceNet Train into Train/Val      
-def train_val_split(root_dir, save_dir, train_percent):
+def train_val_split(root_dir, save_dir, train_percent, format="npy"):
     all_images = list(os.listdir(os.path.join(root_dir, "images")))
     np.random.shuffle(all_images)
 
@@ -126,7 +126,11 @@ def train_val_split(root_dir, save_dir, train_percent):
 
     for img in tqdm(val_images):
         shutil.move(os.path.join(root_dir, "images", img), os.path.join(save_dir, "images"))
-        shutil.move(os.path.join(root_dir, "masks", img.replace(".npy", "_mask.npy")), os.path.join(save_dir, "masks"))
+        if format == "npy":
+            mask_name = img.replace(".npy", "_mask.npy")
+        else:  # format == "png"
+            mask_name = img.replace(".png", "_mask.png")
+        shutil.move(os.path.join(root_dir, "masks", mask_name), os.path.join(save_dir, "masks"))
 
 if __name__ == "__main__":
     """

@@ -46,20 +46,36 @@ DATASET = {
 AUGMENTATION = {
     'TRAIN': {
         'RESIZE': True,
-        # Spatial
-        # 'SHIFT_SCALE_ROTATE': True,  # Keep this
-        # 'DROP_OUT': True,  # Keep this Val-IOU: 0.8258
-        # Pixel
-        'BRIGHTNESS_CONTRAST': True,
-        'BLUR': True,
+        'HORIZONTAL_FLIP': True,
+        'VERTICAL_FLIP': True,
+        'RANDOM_BRIGHTNESS_CONTRAST': True,
         'RANDOM_GAMMA': True,
-        # 'CLAHE': True,  # Contrast Limited Adaptive Histogram Equalization
-        # 'SHARPEN': True,  # Image sharpening
-        # 'COLOR_JITTER': True,  # Random changes in saturation and hue
-        # 'ISO_NOISE': True,  # Simulate camera ISO noise
-        # 'GAUSSIAN_NOISE': True,  # Add random gaussian noise
-        # 'RANDOM_SHADOW': True,  # Add random shadows (helpful for building detection)
-        # 'RANDOM_SUNFLARE': True,  # Simulate sun flare effects
+        'BLUR': True,
+        'SHIFT_SCALE_ROTATE': {
+            'shift_limit': 0.0625,
+            'scale_limit': 0.1,
+            'rotate_limit': 15,
+            'p': 0.5
+        },
+        'NORMALIZE': True
+    },
+    'VAL_TEST': {
+        'RESIZE': True,
+        'NORMALIZE': True
+    }
+}
+
+SEGFORMER_AUGMENTATION = {
+    'TRAIN': {
+        'RESIZE': True,
+        'D4': True,
+        'CROP': True,
+        'SHIFT_SCALE_ROTATE': True,
+        'DISTORTION': True,
+        'RANDOM_BRIGHTNESS_CONTRAST': True,
+        'CLAHE': True,
+        'GAUSSIAN_NOISE': True,
+        'DROP_OUT': True,
         'NORMALIZE': True
     },
     'VAL_TEST': {
@@ -73,7 +89,7 @@ MODEL = {
     'ENCODER_DEPTH':5,
     'ENCODER_WEIGHTS': None,
     'DECODER_CHANNELS': [256, 128, 64, 32, 16],
-    'DECODER_USE_BATCHNORM': True,
+    'DECODER_USE_BATCHNORM': False,
     'DECODER_ATTENTION_TYPE': None,  # scse, cbam, se, none
     'IN_CHANNELS': 3,
     'ACTIVATION': None, # Keep as None since we handle activations in loss function
@@ -153,7 +169,7 @@ BENCHMARK_EXPERIMENTS = {
         'encoder_depth': MODEL['ENCODER_DEPTH'],
         'encoder_weights': MODEL['ENCODER_WEIGHTS'],
         'decoder_channels': MODEL['DECODER_CHANNELS'],
-        'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_use_batchnorm': False,
         'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
         'in_channels': MODEL['IN_CHANNELS'],
         'activation': MODEL['ACTIVATION']
@@ -162,43 +178,100 @@ BENCHMARK_EXPERIMENTS = {
         'id': 'unetpp_resnet50_benchmark',
         'name': 'UNet++ with ResNet50 Encoder (Benchmark)', 
         'architecture': 'UnetPlusPlus',
-        'encoder': 'resnet50', # since resnet50 in unet++ has 50M parameters equivalent to resnet101 in unet
+        'encoder': 'resnet50',
         'encoder_depth': MODEL['ENCODER_DEPTH'],
         'encoder_weights': MODEL['ENCODER_WEIGHTS'],
         'decoder_channels': MODEL['DECODER_CHANNELS'],
-        'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_use_batchnorm': True,
         'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
         'in_channels': MODEL['IN_CHANNELS'],
         'activation': MODEL['ACTIVATION']
     },
+    # 'segformer_b2_benchmark': {
+    #     'id': 'segformer_b2_benchmark',
+    #     'name': 'SegFormer-B2 (Benchmark)',
+    #     'architecture': 'SegFormer',
+    #     'encoder': 'mit_b2',
+    #     'encoder_depth': MODEL['ENCODER_DEPTH'],
+    #     'encoder_weights': 'imagenet',
+    #     'decoder_channels': 768,
+    #     'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+    #     'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
+    #     'in_channels': MODEL['IN_CHANNELS'],
+    #     'activation': MODEL['ACTIVATION'],
+    #     'aux_params': {
+    #         'dropout': 0.1
+    #     }
+    # },
+    # 'segformer_b0_benchmark': {
+    #     'id': 'segformer_b0_benchmark',
+    #     'name': 'SegFormer-B0 (Benchmark)',
+    #     'architecture': 'SegFormer',
+    #     'encoder': 'mit_b0',
+    #     'encoder_depth': 4,  # SegFormer has 4 stages
+    #     'decoder_channels': [32, 64, 160, 256],  # B0 dimensions
+    #     'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+    #     'decoder_attention_type': 'mlp',
+    #     'in_channels': MODEL['IN_CHANNELS'],
+    #     'activation': MODEL['ACTIVATION'],
+    #     'decoder_embed_dim': 256,
+    #     'decoder_mlp_channels': 256,  # B0 channels
+    #     'aux_params': {
+    #         'dropout': 0.1
+    #     }
+    # },
     'segformer_b3_benchmark': {
         'id': 'segformer_b3_benchmark',
         'name': 'SegFormer-B3 (Benchmark)',
         'architecture': 'SegFormer',
         'encoder': 'mit_b3',
-        'encoder_depth': MODEL['ENCODER_DEPTH'],
-        'encoder_weights': MODEL['ENCODER_WEIGHTS'],
-        'decoder_channels': 256,
+        'encoder_depth': MODEL['ENCODER_DEPTH'],  # SegFormer-B3 has 4 stages
+        'encoder_weights': 'imagenet',
         'decoder_use_batchnorm': MODEL['DECODER_USE_BATCHNORM'],
+        'decoder_channels': 256,
         'decoder_attention_type': MODEL['DECODER_ATTENTION_TYPE'],
         'in_channels': MODEL['IN_CHANNELS'],
-        'activation': MODEL['ACTIVATION']
-    }
+        'activation': MODEL['ACTIVATION'],
+    },
+    'deeplabv3plus_resnet101_benchmark': {
+        'id': 'deeplabv3plus_resnet101_benchmark',
+        'name': 'DeepLabV3+ with ResNet101 Encoder (Benchmark)',
+        'architecture': 'DeepLabV3Plus',
+        'encoder': 'resnet101',
+        'encoder_depth': MODEL['ENCODER_DEPTH'],
+        'encoder_weights': MODEL['ENCODER_WEIGHTS'],
+        'encoder_output_stride': 16,  # Essential for DeepLabV3+
+        'decoder_channels': 256,
+        'decoder_atrous_rates': (6, 12, 18),  # Reduced rates for our image size
+        'decoder_aspp_separable': False,  # Start with standard convolutions
+        'decoder_aspp_dropout': 0.2,  # Reduced dropout
+        'in_channels': MODEL['IN_CHANNELS'],
+        'decoder_use_batchnorm': True,
+        'decoder_attention_type': None,
+        'activation': MODEL['ACTIVATION'],
+    },
+    'clipseg': {
+        'id': 'clipseg',
+        'name': 'CLIPSeg RD64 Refined',
+        'architecture': 'CLIPSeg',
+        'model_id': 'CIDAS/clipseg-rd64-refined',
+        'threshold': 0.5,  # Confidence threshold
+        'post_process': True  # Always post-process CLIPSeg outputs
+    },
 }
 
 # Training Configuration
 TRAINING = {
-    'BATCH_SIZE': 4,
-    'GRADIENT_ACCUMULATION_STEPS': 2,  # Simulate batch_size of 8
+    'BATCH_SIZE': 4,  # Reduce batch size
+    'GRADIENT_ACCUMULATION_STEPS': 2,  # Accumulate for stability
     'NUM_EPOCHS': 50,
-    'LEARNING_RATE': 0.001, # 1e-3
-    'MAX_LR': 1.32E-03, # Found from find_optimal_lr for one cycle scheduler, perfromed best.
+    'LEARNING_RATE': 0.0001,  # Lower learning rate
     'OPTIMIZER': 'adamw',
     'optim_params': {
-            'betas': (0.9, 0.999),
-            'eps': 1e-8,  # Default Adam epsilon
-            'weight_decay': 0.0001  # L2 regularization
-        },
+        'betas': (0.9, 0.999),
+        'eps': 1e-8,
+        'weight_decay': 0.01  # Increase regularization
+    },
     'LOSS_FUNCTION': 'DiceLoss+CrossEntropyLoss',
     'IGNORE_BACKGROUND': False,
     'NUM_WORKERS': 8,
@@ -206,16 +279,47 @@ TRAINING = {
     'SAVE_CHECKPOINT_FREQ': 5,  # Save checkpoint every N epochs
     'SCHEDULER': 'one_cycle',
     'SCHEDULER_PARAMS': {
-            'pct_start': 0.5,
-            'anneal_strategy': 'linear',
-            'cycle_momentum': True,
-            'base_momentum': 0.85,
-            'max_momentum': 0.95,
-            'div_factor': 25.0,
-            'final_div_factor': 1e4
-        },
+        'pct_start': 0.5,
+        'anneal_strategy': 'linear',
+        'cycle_momentum': True,
+        'base_momentum': 0.85,
+        'max_momentum': 0.95,
+        'div_factor': 10.0,  # Less aggressive LR range
+        'final_div_factor': 1e4
+    },
     'AUGMENTATION': AUGMENTATION
 }
+
+# Add SegFormer specific configuration
+SEGFORMER_TRAINING_CONFIG = {
+    'BATCH_SIZE': 8,  # They used 8 for high-res images like Cityscapes
+    'GRADIENT_ACCUMULATION_STEPS': 1,
+    'NUM_EPOCHS': 50,  # They used 160K iterations
+    'LEARNING_RATE': 0.00006,  # This matches their setting
+    'OPTIMIZER': 'adamw',
+    'optim_params': {
+        'betas': (0.9, 0.999),
+        'eps': 1e-8,
+        'weight_decay': 0.01
+    },
+    # 'MAX_LR': 0.0012,
+    'SCHEDULER': 'reduce_lr_on_plateau',
+    'SCHEDULER_PARAMS': {
+        'mode': 'max',           # Monitor IoU which we want to maximize
+        'factor': 0.5,          # Reduce LR by half when plateauing
+        'patience': 5,          # Number of epochs with no improvement
+        'min_lr': 1e-7,        # Don't reduce LR below this
+        'threshold': 1e-4,      # Minimum change to qualify as an improvement
+        'threshold_mode': 'rel', # Use relative change
+        'cooldown': 2,         # Number of epochs to wait before resuming normal operation
+        'verbose': True        # Print message when reducing LR
+    },
+    'LOSS_FUNCTION': 'DiceLoss+CrossEntropyLoss',
+    'IGNORE_BACKGROUND': False,
+    'NUM_WORKERS': 8,
+    'PIN_MEMORY': True,
+    'AUGMENTATION': SEGFORMER_AUGMENTATION,
+} 
 
 # Metrics Configuration
 METRICS = {
@@ -261,6 +365,10 @@ VISUALIZATION = {
 
 # Device Configuration
 def get_device():
+    # Set MPS fallback for unsupported operations
+    import os
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    
     if torch.cuda.is_available():
         return torch.device('cuda')
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -269,3 +377,25 @@ def get_device():
         return torch.device('cpu')
 
 DEVICE = get_device()
+
+# Add upsampling mode configuration - bilinear is more compatible with MPS
+UPSAMPLING_MODE = 'bilinear'  # Options: 'bilinear', 'bicubic', 'nearest'
+
+# Function to patch model with bilinear upsampling
+def patch_upsampling_mode(model):
+    """
+    Patches a PyTorch model to use the configured upsampling mode.
+    Helps with MPS compatibility issues.
+    """
+    import torch.nn as nn
+    
+    # Find all upsample modules and replace their mode
+    for module in model.modules():
+        if hasattr(module, 'mode') and hasattr(module, 'align_corners') and hasattr(module, 'upsample'):
+            # This is likely an upsampling module
+            module.mode = UPSAMPLING_MODE
+        
+        # For functional calls within forward methods, we can't directly patch
+        # Users should manually replace F.interpolate calls with the right mode
+    
+    return model

@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import os
 import segmentation_models_pytorch as smp
-from training.train_utils import TrainingLogger, train_epoch, validate
-from training.metrics import run_inference, SegmentationMetrics
+from src.training.train_utils import TrainingLogger, train_epoch, validate
+from src.training.metrics import run_inference, SegmentationMetrics
 import json
 from src.config.base_config import TRAINING, METRICS, LOGS_DIR, CHECKPOINTS_DIR
 from src.utils.utils import find_optimal_lr
@@ -195,6 +195,12 @@ class Trainer:
                     steps_per_epoch=len(self.train_loader),
                     **training_config['SCHEDULER_PARAMS']
                 )
+            elif training_config['SCHEDULER'] == 'poly':
+                self.scheduler = optim.lr_scheduler.PolynomialLR(
+                    self.optimizer,
+                    total_iters=num_epochs * len(self.train_loader),
+                    power=training_config['SCHEDULER_PARAMS']['power']
+                )
                 
         # Load checkpoint if resuming
         self.start_epoch = 0
@@ -205,8 +211,8 @@ class Trainer:
                 print(f"Resuming from epoch {self.start_epoch}")
         
         self.early_stopping = EarlyStopping(
-            patience=7,  # Stop if no improvement for 7 epochs
-            min_delta=0.0005,  # Minimum IoU improvement of 0.05%
+            patience=12,  # More patience to allow learning through plateaus
+            min_delta=0.0001,  # Smaller improvement threshold
             mode='max'
         )
         
@@ -230,7 +236,7 @@ class Trainer:
                 self.criterion,
                 self.optimizer,
                 self.device,
-                self.scheduler if self.training_config['SCHEDULER'] == 'one_cycle' else None,
+                self.scheduler if self.training_config['SCHEDULER'] == 'one_cycle' else None, 
                 gradient_accumulation_steps
             )
             
@@ -288,6 +294,8 @@ class Trainer:
             if hasattr(self, 'scheduler'):
                 if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                     self.scheduler.step(val_metrics['loss'])
+                elif isinstance(self.scheduler, optim.lr_scheduler.PolynomialLR):
+                    self.scheduler.step(epoch)  # Pass the current epoch number
     
     def save_checkpoint(self, is_best=False, error=False):
         """Save model checkpoint"""

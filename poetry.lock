@@ -181,15 +181,15 @@ stringzilla = ">=3.10.4"
 
 [[package]]
 name = "albumentations"
-version = "1.4.24"
+version = "2.0.4"
 description = "Fast, flexible, and advanced augmentation library for deep learning, computer vision, and medical imaging. Albumentations offers a wide range of transformations for both 2D (images, masks, bboxes, keypoints) and 3D (volumes, volumetric masks) data, with optimized performance and seamless integration into ML workflows."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 markers = "(python_version >= \"3.12\" or python_version <= \"3.11\") and (sys_platform == \"darwin\" or sys_platform == \"linux\" or sys_platform == \"win32\" or sys_platform != \"linux\" and sys_platform != \"win32\" and sys_platform != \"darwin\")"
 files = [
-    {file = "albumentations-1.4.24-py3-none-any.whl", hash = "sha256:2f639257a11e681071f4f7d10f6a6d874ae705bcce52746874cd8d7e317a16d7"},
-    {file = "albumentations-1.4.24.tar.gz", hash = "sha256:cc8874cb0abccc9117aefacbe385c354ac824fa142f46a6c0896d65cec5f8a6d"},
+    {file = "albumentations-2.0.4-py3-none-any.whl", hash = "sha256:1d60b62527d34bb8791fad90f6faeeb065ecc5cb4577ff85614f022d56183010"},
+    {file = "albumentations-2.0.4.tar.gz", hash = "sha256:4f0cd22576fba8030fc99f1ccacee1452a1880ac2a9ce0882f0d93e5477d5c70"},
 ]
 
 [package.dependencies]
@@ -3277,29 +3277,32 @@ test = ["Cython", "array-api-strict (>=2.0)", "asv", "gmpy2", "hypothesis (>=6.3
 
 [[package]]
 name = "segmentation-models-pytorch"
-version = "0.3.4"
+version = "0.4.0"
 description = "Image segmentation models with pre-trained backbones. PyTorch."
 optional = false
-python-versions = ">=3.9.0"
+python-versions = ">=3.9"
 groups = ["main"]
 markers = "(python_version >= \"3.12\" or python_version <= \"3.11\") and (sys_platform == \"darwin\" or sys_platform == \"linux\" or sys_platform == \"win32\" or sys_platform != \"linux\" and sys_platform != \"win32\" and sys_platform != \"darwin\")"
 files = [
-    {file = "segmentation_models_pytorch-0.3.4-py3-none-any.whl", hash = "sha256:767a54b96e8a4d5c96e5bb9e4422e4970370fdfc1671b111e4097fc24406b537"},
-    {file = "segmentation_models_pytorch-0.3.4.tar.gz", hash = "sha256:f4aee7f6add479bd3c3953e855b7055fc657dc6800bf7fc8ab733fd7f8acb163"},
+    {file = "segmentation_models_pytorch-0.4.0-py3-none-any.whl", hash = "sha256:2cd95a985d7d2d87d94bddef9f0398fd16ec5f54dda0619bcc3a25555c3eb86a"},
+    {file = "segmentation_models_pytorch-0.4.0.tar.gz", hash = "sha256:8833e63f0846090667be6fce05a2bbebbd1537776d3dea72916aa3db9e22e55b"},
 ]
 
 [package.dependencies]
-efficientnet-pytorch = "0.7.1"
-huggingface-hub = ">=0.24.6"
-pillow = "*"
-pretrainedmodels = "0.7.4"
-six = "*"
-timm = "0.9.7"
-torchvision = ">=0.5.0"
-tqdm = "*"
+efficientnet-pytorch = ">=0.6.1"
+huggingface-hub = ">=0.24"
+numpy = ">=1.19.3"
+pillow = ">=8"
+pretrainedmodels = ">=0.7.1"
+six = ">=1.5"
+timm = ">=0.9"
+torch = ">=1.8"
+torchvision = ">=0.9"
+tqdm = ">=4.42.1"
 
 [package.extras]
-test = ["mock", "pytest", "ruff (==0.5.2)"]
+docs = ["autodocsumm", "huggingface-hub", "six", "sphinx", "sphinx-book-theme"]
+test = ["packaging", "pytest", "pytest-cov", "pytest-xdist", "ruff"]
 
 [[package]]
 name = "setuptools"
@@ -4182,4 +4185,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "5672412ab72bc271c2a48d772adb092ad0fe33f34d19600eb7d57f3cea8a7958"
+content-hash = "b5e10ebc01ce22fbb6122580236ca46e500b933d0254b997691f8ed4ae5b2935"

@@ -6,14 +6,16 @@ import rasterio
 from rasterio.plot import reshape_as_image
 from tqdm import tqdm
 import argparse
+from PIL import Image
 
 
 class SpaceNetMultiChannelMaskConverter:
-    def __init__(self, root_dir, save_dir, aoi_id, location):
+    def __init__(self, root_dir, save_dir, aoi_id, location, output_format):
         self.root_dir = root_dir
         self.save_dir = save_dir
         self.aoi_id = aoi_id
         self.location = location
+        self.output_format = output_format
 
         self.image_prefix = "RGB-PanSharpen_AOI_{}_{}_img".format(self.aoi_id, self.location)
         self.mask_prefix = "buildings_AOI_{}_{}_img".format(self.aoi_id, self.location)
@@ -21,11 +23,10 @@ class SpaceNetMultiChannelMaskConverter:
         geojson_files = os.listdir(os.path.join(root_dir, 'geojson/buildings'))
         self.ids = [g[g.index('img') + 3: g.index('.')] for g in geojson_files]
 
-        if 'masks' not in os.listdir(save_dir):
-            os.mkdir(f"{save_dir}/masks")
-            
-        if 'images' not in os.listdir(save_dir):
-            os.mkdir(f"{save_dir}/images")
+        if self.output_format not in os.listdir(save_dir):
+            os.mkdir(f"{self.save_dir}/{self.output_format}")
+            os.mkdir(f"{self.save_dir}/{self.output_format}/masks")
+            os.mkdir(f"{self.save_dir}/{self.output_format}/images")
 
     def convertAllToMultiChannelMask(self):
         for img_id in tqdm(self.ids):
@@ -60,9 +61,22 @@ class SpaceNetMultiChannelMaskConverter:
         # Convert mask to uint8
         fbc_mask = fbc_mask.astype(np.uint8)
 
-        # Save the image and multi-channel mask
-        np.save(os.path.join(self.save_dir, "images", img_id), image)
-        np.save(os.path.join(self.save_dir, "masks", img_id + "_multi_channel_mask"), fbc_mask)
+        if self.output_format == "npy":
+            # save images
+            np.save(os.path.join(self.save_dir, f"{self.output_format}/images", img_id), image)
+            # save masks
+            np.save(os.path.join(self.save_dir, f"{self.output_format}/masks", img_id + "_multi_channel_mask"), fbc_mask)
+        
+        elif self.output_format == "png":
+            # Convert and save images as PNG
+            image_path = os.path.join(self.save_dir, f"{self.output_format}/images", img_id + ".png")
+            Image.fromarray(image).save(image_path)
+
+            # Convert and save masks as PNG
+            mask_path = os.path.join(self.save_dir, f"{self.output_format}/masks", img_id + "_multi_channel_mask.png")
+            Image.fromarray(fbc_mask).save(mask_path)
+
+        print("Finished!")
 
 
 def main():
@@ -71,6 +85,7 @@ def main():
     parser.add_argument('--save_dir', type=str, required=True, help='Path to the directory where processed data will be saved.')
     parser.add_argument('--aoi_id', type=int, required=True, help='Area of Interest (AOI) ID.')
     parser.add_argument('--location', type=str, required=True, help='Location name.')
+    parser.add_argument('--output_format', type=str, required=True, help='Output format.')
 
     args = parser.parse_args()
 
@@ -78,7 +93,8 @@ def main():
         args.root_dir,
         args.save_dir,
         args.aoi_id,
-        args.location
+        args.location,
+        args.output_format
     )
     converter.convertAllToMultiChannelMask()
 

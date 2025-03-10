@@ -6,6 +6,7 @@ from collections import defaultdict
 import os
 import torchvision.utils as vutils
 from src.config.base_config import DATASET, METRICS, TRAINING
+from src.utils.post_processing import sharpen_building_masks
 
 class MetricFunction:
     """Wrapper class for smp.metrics.functional metrics"""
@@ -112,6 +113,31 @@ class SegmentationMetrics:
         
         return metrics_dict
 
+    @staticmethod
+    def update_clipseg(pred_mask, gt_mask):
+        """
+        Compute metrics for CLIPSeg predictions
+        Args:
+            pred_mask: Binary prediction mask
+            gt_mask: Ground truth mask with all classes
+        """
+        # Extract building class from ground truth
+        gt_buildings = (gt_mask == DATASET['CLASS_LABELS'].index('Building')).cpu().numpy()
+        
+        # Compute metrics
+        tp = np.logical_and(pred_mask, gt_buildings).sum()
+        fp = np.logical_and(pred_mask, np.logical_not(gt_buildings)).sum()
+        fn = np.logical_and(np.logical_not(pred_mask), gt_buildings).sum()
+        
+        # Calculate metrics
+        metrics = {}
+        metrics['IoU'] = tp / (tp + fp + fn + 1e-6)
+        metrics['F1_Score'] = 2 * tp / (2 * tp + fp + fn + 1e-6)
+        metrics['Precision'] = tp / (tp + fp + 1e-6)
+        metrics['Recall'] = tp / (tp + fn + 1e-6)
+        
+        return metrics
+
 def compute_mean_metrics(metrics_list):
     """Compute mean metrics across batches"""
     mean_metrics = defaultdict(float)
@@ -144,21 +170,55 @@ def save_prediction(pred_mask, save_path):
     # Save image
     vutils.save_image(colored_mask.permute(2, 0, 1) / 255.0, save_path)
 
-def run_inference(model, data_loader, device, save_predictions=False, save_dir=None):
+def run_inference(model, data_loader, device, save_predictions=False, post_process=False, model_pred_dir=None, post_pred_dir=None):
     """Run inference and compute metrics"""
-    model.eval()
+    # Set model to eval mode if it has the method
+    if hasattr(model, 'eval'):
+        model.eval()
+    
     metrics = SegmentationMetrics()
     all_metrics = []
     
-    if save_predictions and save_dir:
-        os.makedirs(save_dir, exist_ok=True)
+    if save_predictions and model_pred_dir:
+        os.makedirs(model_pred_dir, exist_ok=True)
+    if post_process and post_pred_dir:
+        os.makedirs(post_pred_dir, exist_ok=True)
     
     with torch.no_grad():
         for batch_idx, (images, masks) in enumerate(tqdm(data_loader, desc='Inference')):
             images = images.to(device)
             masks = masks.to(device)
             
-            # Forward pass
+            # Handle CLIPSeg differently
+            if hasattr(model, 'prompts'):  # Check if it's CLIPSeg model
+                batch_metrics = []
+                for i in range(len(images)):
+                    # Get prediction for single image
+                    pred_mask = model.predict(
+                        images[i],  # Pass tensor directly, predict method will handle conversion
+                        threshold=None  # Using Otsu's thresholding instead
+                    )
+                    
+                    if save_predictions:
+                        save_path = os.path.join(model_pred_dir, f'pred_{batch_idx}_{i}.png')
+                        save_prediction(torch.from_numpy(pred_mask), save_path)
+                    
+                    if post_process:
+                        pred_mask = sharpen_building_masks(pred_mask, building_class_idx=1)
+                        if save_predictions:
+                            post_save_path = os.path.join(post_pred_dir, f'pred_{batch_idx}_{i}.png')
+                            save_prediction(torch.from_numpy(pred_mask), post_save_path)
+                    
+                    # Compute metrics for single image
+                    img_metrics = metrics.update_clipseg(pred_mask, masks[i])
+                    batch_metrics.append(img_metrics)
+                
+                # Average batch metrics
+                avg_metrics = {k: np.mean([m[k] for m in batch_metrics]) for k in batch_metrics[0]}
+                all_metrics.append(avg_metrics)
+                continue
+            
+            # Forward pass for other models
             outputs = model(images)
             
             # Compute metrics for batch
@@ -173,8 +233,17 @@ def run_inference(model, data_loader, device, save_predictions=False, save_dir=N
             if save_predictions:
                 pred_masks = torch.argmax(outputs, dim=1)
                 for i in range(len(images)):
-                    save_path = os.path.join(save_dir, f'pred_{batch_idx}_{i}.png')
+                    save_path = os.path.join(model_pred_dir, f'pred_{batch_idx}_{i}.png')
                     save_prediction(pred_masks[i], save_path)
+                    if post_process:
+                        post_processed_mask = torch.from_numpy(
+                            sharpen_building_masks(
+                                pred_masks[i],
+                                building_class_idx=DATASET['CLASS_LABELS'].index('Building')
+                            )
+                        ).to(pred_masks.device)
+                        post_save_path = os.path.join(post_pred_dir, f'pred_{batch_idx}_{i}.png')
+                        save_prediction(post_processed_mask, post_save_path)
     
     # Compute mean metrics and ensure they are JSON serializable
     mean_metrics = compute_mean_metrics(all_metrics)

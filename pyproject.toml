@@ -21,7 +21,7 @@ opencv-python = "^4.10.0.84"
 georaster = "^1.25"
 scikit-image = "^0.25.0"
 albumentations = "^2.0.3"
-segmentation-models-pytorch = "^0.3.0"
+segmentation-models-pytorch = "^0.4.0"
 
 [build-system]
 requires = ["poetry-core"]

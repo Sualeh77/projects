@@ -3,13 +3,12 @@ warnings.filterwarnings('ignore')
 
 import torch
 from torch.utils.data import DataLoader
-import segmentation_models_pytorch as smp
 from datasets.custom_datasets.spacenet_dataset import CustomSpacenetDataset
-from training.train import Trainer
-from src.utils.utils import compute_mean_std, get_transforms
+from src.training.train import Trainer
+from src.utils.utils import get_transforms
 from src.config.base_config import (
-    MODEL, TRAINING, DATASET, DEVICE, AUGMENTATION, LOGS_DIR, 
-    EXPERIMENTS, BENCHMARK_EXPERIMENTS
+    TRAINING, DATASET, DEVICE, LOGS_DIR, 
+    EXPERIMENTS, BENCHMARK_EXPERIMENTS, SEGFORMER_TRAINING_CONFIG
 )
 from src.models.get_model import get_model
 import os
@@ -20,14 +19,20 @@ def run_experiment(model_conf, training_config=None, learning_rate=None, optimiz
     device = DEVICE
     
     # Override training config with hyperparameter settings if provided
-    if training_config is None:
+    if training_config is None and 'segformer' in model_conf['id']:
+        training_config = SEGFORMER_TRAINING_CONFIG.copy()
+    elif training_config is None:
         training_config = TRAINING.copy()
+    
     if learning_rate is not None:
         training_config['LEARNING_RATE'] = learning_rate
     if optimizer is not None:
         training_config['OPTIMIZER'] = optimizer
     if scheduler is not None:
         training_config['SCHEDULER'] = scheduler
+
+    # print(training_config)
+    # return
     
     # Get transforms
     train_transforms = get_transforms('train', augmentations=training_config['AUGMENTATION']['TRAIN'])
@@ -66,14 +71,21 @@ def run_experiment(model_conf, training_config=None, learning_rate=None, optimiz
         architecture=model_conf['architecture'],
         encoder=model_conf['encoder'], 
         encoder_weights=model_conf['encoder_weights'],
-        encoder_depth=model_conf['encoder_depth'],
-        decoder_channels=model_conf['decoder_channels'],
-        decoder_use_batchnorm=model_conf['decoder_use_batchnorm'],
-        decoder_attention_type=model_conf['decoder_attention_type'],
+        encoder_depth=model_conf.get('encoder_depth', None),
+        decoder_channels=model_conf.get('decoder_channels', None),
+        decoder_use_batchnorm=model_conf.get('decoder_use_batchnorm', None),
+        decoder_attention_type=model_conf.get('decoder_attention_type', None),
         in_channels=model_conf['in_channels'],
         classes=DATASET['NUM_CLASSES'],
-        activation=model_conf['activation']
+        activation=model_conf['activation'],
+        decoder_atrous_rates=model_conf.get('decoder_atrous_rates', None),
+        decoder_aspp_separable=model_conf.get('decoder_aspp_separable', None),
+        decoder_aspp_dropout=model_conf.get('decoder_aspp_dropout', None)
     )
+    
+    # # Set model name for SegFormer identification
+    # if 'segformer' in model_conf['architecture'].lower():
+    #     model.name = 'segformer'
     
     # Initialize trainer
     trainer = Trainer(
