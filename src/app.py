@@ -21,6 +21,11 @@ from src.config.hyperparameter_config import (
     SCHEDULER_EXPERIMENTS,
     AUGMENTATION_EXPERIMENTS
 )
+import cv2
+from sam2.build_sam import build_sam2
+from sam2.sam2_image_predictor import SAM2ImagePredictor
+from hydra import initialize, compose
+from hydra.core.global_hydra import GlobalHydra
 
 app = Flask(__name__)
 
@@ -587,7 +592,7 @@ def run_inference():
             gt_mask = gt_mask[:,:,0]  # Take first channel if RGB
         gt_mask = (gt_mask > 0).astype(np.uint8)  # Binarize
         
-        # Store original mask size for later resizing
+        # Store original size for later resizing
         original_size = gt_mask.shape[:2]  # (height, width)
         
         results = {'predictions': {}}
@@ -597,8 +602,107 @@ def run_inference():
             # Load model
             if model_name == 'clipseg':
                 model = CLIPSegPredictor(device=DEVICE)
+                print(f"Initialized CLIPSegPredictor on device: {DEVICE}")  # Debug statement
+                # Get prediction
+                with torch.no_grad():
+                    pred_mask = model.predict(image_tensor[0])
+                    # print(f"CLIPSeg prediction shape: {pred_mask.shape}")  # Debug statement
+                    # Resize prediction to match ground truth size
+                    pred_mask = Image.fromarray(pred_mask).resize(
+                        (original_size[1], original_size[0]),
+                        Image.Resampling.NEAREST
+                    )
+                    pred_mask = np.array(pred_mask)
+            elif model_name == 'sam2':
+                # SAM2 specific handling
+                try:
+                    # Load SAM2 model and checkpoint
+                    sam2_checkpoint = os.path.join(CHECKPOINTS_DIR, 'benchmark/sam2.1/fine_tuned_sam2_3000.torch')
+                    
+                    # Initialize Hydra configuration
+                    from hydra import initialize, compose
+                    from hydra.core.global_hydra import GlobalHydra
+                    
+                    # Reset Hydra's global state
+                    if GlobalHydra.instance().is_initialized():
+                        GlobalHydra.instance().clear()
+                    
+                    # Initialize Hydra with the relative config path
+                    with initialize(version_base=None, config_path="../../sam_finetuning/sam2/sam2/configs"):
+                        # Load the specific config file
+                        cfg = compose(config_name="sam2.1/sam2.1_hiera_s")
+                        
+                        # Initialize SAM2 model with config
+                        sam2_model = build_sam2(
+                            config_file="sam2.1/sam2.1_hiera_s",
+                            checkpoint=sam2_checkpoint,
+                            device=DEVICE
+                        )
+                        predictor = SAM2ImagePredictor(sam2_model)
+                    
+                    # Load the fine-tuned weights
+                    checkpoint = torch.load(sam2_checkpoint, map_location=DEVICE)
+                    predictor.model.load_state_dict(checkpoint['model_state_dict'])
+                    
+                    # Process image for SAM2
+                    image_np = np.array(image)
+                    if image_np.shape[-1] == 4:  # If RGBA, convert to RGB
+                        image_np = image_np[..., :3]
+                    
+                    # Resize image
+                    r = min(512 / image_np.shape[1], 512 / image_np.shape[0])
+                    new_size = (int(image_np.shape[1] * r), int(image_np.shape[0] * r))
+                    processed_image = cv2.resize(image_np, new_size)
+                    
+                    # Generate points for prediction
+                    num_samples = 30
+                    initial_mask = np.zeros(processed_image.shape[:2], dtype=np.uint8)
+                    initial_mask[50:-50, 50:-50] = 1  # Simple initial guess for buildings
+                    input_points = []
+                    coords = np.argwhere(initial_mask > 0)
+                    for i in range(num_samples):
+                        yx = coords[np.random.randint(len(coords))]
+                        input_points.append([[yx[1], yx[0]]])
+                    input_points = np.array(input_points)
+                    
+                    # Perform inference
+                    with torch.no_grad():
+                        predictor.set_image(processed_image)
+                        masks, scores, logits = predictor.predict(
+                            point_coords=input_points,
+                            point_labels=np.ones([input_points.shape[0], 1])
+                        )
+                    
+                    # Process predictions
+                    np_masks = np.array(masks[:, 0])
+                    np_scores = scores[:, 0]
+                    sorted_masks = np_masks[np.argsort(np_scores)][::-1]
+                    
+                    # Combine masks
+                    pred_mask = np.zeros_like(sorted_masks[0], dtype=np.uint8)
+                    occupancy_mask = np.zeros_like(sorted_masks[0], dtype=bool)
+                    
+                    for i in range(sorted_masks.shape[0]):
+                        mask = sorted_masks[i]
+                        if (mask * occupancy_mask).sum() / (mask.sum() + 1e-6) > 0.15:
+                            continue
+                        mask_bool = mask.astype(bool)
+                        mask_bool[occupancy_mask] = False
+                        pred_mask[mask_bool] = 1
+                        occupancy_mask[mask_bool] = True
+                    
+                    # Resize prediction to match ground truth size
+                    pred_mask = Image.fromarray(pred_mask).resize(
+                        (original_size[1], original_size[0]),
+                        Image.Resampling.NEAREST
+                    )
+                    pred_mask = np.array(pred_mask)
+                    
+                except Exception as e:
+                    print(f"Error in SAM2 inference: {str(e)}")
+                    pred_mask = np.zeros(original_size, dtype=np.uint8)
             else:
-                # Match the exact parameters expected by get_model()
+                # Original benchmark model handling
                 model_params = {
                     'architecture': config['architecture'],
                     'encoder': config['encoder'],
@@ -622,34 +726,33 @@ def run_inference():
                 )
                 model.load_state_dict(checkpoint['model_state_dict'])
                 model.eval()
-            
-            # Get prediction
-            with torch.no_grad():
-                if model_name == 'clipseg':
-                    pred_mask = model.predict(image_tensor[0])
-                else:
-                    outputs = model(image_tensor)
-                    pred_mask = torch.argmax(outputs, dim=1)[0].cpu().numpy()
-                    pred_mask = (pred_mask == DATASET['CLASS_LABELS'].index('Building')).astype(np.uint8)
-            
-            # Post-process if configured
-            if config.get('post_process', False):
-                pred_mask = sharpen_building_masks(pred_mask, building_class_idx=1)
-            
-            # Resize prediction to match ground truth size
-            pred_mask = Image.fromarray(pred_mask).resize(
-                (original_size[1], original_size[0]),  # PIL uses (width, height)
-                Image.Resampling.NEAREST  # Use nearest neighbor to preserve binary values
-            )
-            pred_mask = np.array(pred_mask)
+                
+                # Get prediction
+                with torch.no_grad():
+                    if model_name == 'clipseg':
+                        pred_mask = model.predict(image_tensor[0])
+                    else:
+                        outputs = model(image_tensor)
+                        pred_mask = torch.argmax(outputs, dim=1)[0].cpu().numpy()
+                        pred_mask = (pred_mask == DATASET['CLASS_LABELS'].index('Building')).astype(np.uint8)
+                
+                # Post-process if configured
+                if config.get('post_process', False):
+                    pred_mask = sharpen_building_masks(pred_mask, building_class_idx=1)
+                
+                # Resize prediction to match ground truth size
+                pred_mask = Image.fromarray(pred_mask).resize(
+                    (original_size[1], original_size[0]),
+                    Image.Resampling.NEAREST
+                )
+                pred_mask = np.array(pred_mask)
             
             # Compute IoU
             intersection = np.logical_and(pred_mask, gt_mask).sum()
             union = np.logical_or(pred_mask, gt_mask).sum()
             iou = float(intersection) / (union + 1e-6)
             
-            # Save mask image
-            # Create RGBA image with transparent background
+            # Create RGBA mask with transparent background
             rgba_mask = np.zeros((pred_mask.shape[0], pred_mask.shape[1], 4), dtype=np.uint8)
             rgba_mask[pred_mask == 1] = [255, 255, 255, 255]  # White with full opacity for buildings
             rgba_mask[pred_mask == 0] = [0, 0, 0, 0]  # Transparent for background

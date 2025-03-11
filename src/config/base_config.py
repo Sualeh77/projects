@@ -258,6 +258,13 @@ BENCHMARK_EXPERIMENTS = {
         'threshold': 0.5,  # Confidence threshold
         'post_process': True  # Always post-process CLIPSeg outputs
     },
+    'sam2': {
+        'name': 'SAM2',
+        'id': 'sam2',
+        'architecture': 'sam2',
+        'post_process': False,  # SAM2 doesn't need post-processing
+        'model_cfg': '../../sam_finetuning/sam2/sam2/configs/sam2.1/sam2.1_hiera_s.yaml'  # Going up two levels to Dissertation
+    }
 }
 
 # Training Configuration

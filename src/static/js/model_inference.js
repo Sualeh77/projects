@@ -5,7 +5,8 @@ class ModelInference {
             'unetpp_resnet50_benchmark': 'rgba(0, 255, 0, 0.5)',   // Green
             'deeplabv3plus_resnet101_benchmark': 'rgba(0, 0, 255, 0.5)', // Blue
             'segformer_b3_benchmark': 'rgba(255, 165, 0, 0.5)',    // Orange
-            'clipseg': 'rgba(255, 0, 255, 0.5)'                    // Magenta
+            'clipseg': 'rgba(255, 0, 255, 0.5)',                    // Magenta
+            'sam2': 'rgba(0, 0, 0, 0.5)'                            // Black
         };
         this.predictions = new Map();
         this.setupEventListeners();
